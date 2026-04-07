@@ -411,7 +411,7 @@ local function readSettings()
 end
 
 -- Key system (server verify: key + hwid)
-local KEYSYS_API_URL = "https://luascript-best.up.railway.app/verify"
+local KEYSYS_API_URL = "lua-key-server-production.up.railway.app/verify"
 local KEYSYS_CACHE_FILE = SETTINGS_REL_DIR .. "/Simple_Draggable_Toggle_UI_KeyCache.json"
 local keyAuthPassed = false
 
