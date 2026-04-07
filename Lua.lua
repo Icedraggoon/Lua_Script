@@ -411,7 +411,7 @@ local function readSettings()
 end
 
 -- Key system (server verify: key + hwid)
-local KEYSYS_API_URL = "lua-key-server-production.up.railway.app/verify"
+local KEYSYS_API_URL = "https://lua-key-server-production.up.railway.app/verify"
 local KEYSYS_CACHE_FILE = SETTINGS_REL_DIR .. "/Simple_Draggable_Toggle_UI_KeyCache.json"
 local keyAuthPassed = false
 
@@ -1487,6 +1487,7 @@ authGate.BackgroundColor3 = Color3.fromRGB(28, 28, 35)
 authGate.BorderSizePixel = 1
 authGate.BorderColor3 = Color3.fromRGB(80, 80, 100)
 authGate.ZIndex = 1000
+authGate.Active = true
 Instance.new("UICorner", authGate).CornerRadius = UDim.new(0, 8)
 
 local authTitle = Instance.new("TextLabel")
@@ -1500,6 +1501,7 @@ authTitle.TextSize = 13
 authTitle.TextXAlignment = Enum.TextXAlignment.Left
 authTitle.Text = "Key Verification"
 authTitle.ZIndex = 1001
+authTitle.Active = true
 
 local authInput = Instance.new("TextBox")
 authInput.Parent = authGate
@@ -1585,6 +1587,41 @@ authBtn.MouseButton1Click:Connect(runKeyVerify)
 authInput.FocusLost:Connect(function(enterPressed)
     if enterPressed then
         runKeyVerify()
+    end
+end)
+
+-- Drag logic (key auth gate)
+local authDragging = false
+local authDragStart = Vector2.new()
+local authStartPos = UDim2.new()
+
+authTitle.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1
+    or input.UserInputType == Enum.UserInputType.Touch then
+        authDragging = true
+        authDragStart = input.Position
+        authStartPos = authGate.Position
+    end
+end)
+
+UIS.InputChanged:Connect(function(input)
+    if not authDragging then return end
+    if input.UserInputType ~= Enum.UserInputType.MouseMovement
+    and input.UserInputType ~= Enum.UserInputType.Touch then return end
+
+    local delta = input.Position - authDragStart
+    authGate.Position = UDim2.new(
+        authStartPos.X.Scale,
+        authStartPos.X.Offset + delta.X,
+        authStartPos.Y.Scale,
+        authStartPos.Y.Offset + delta.Y
+    )
+end)
+
+UIS.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1
+    or input.UserInputType == Enum.UserInputType.Touch then
+        authDragging = false
     end
 end)
 
