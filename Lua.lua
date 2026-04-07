@@ -410,6 +410,147 @@ local function readSettings()
     return nil
 end
 
+-- Key system (server verify: key + hwid)
+local KEYSYS_API_URL = "https://luascript-best.up.railway.app/verify"
+local KEYSYS_CACHE_FILE = SETTINGS_REL_DIR .. "/Simple_Draggable_Toggle_UI_KeyCache.json"
+local keyAuthPassed = false
+
+local function getBestHWID()
+    local id = nil
+    pcall(function()
+        if type(gethwid) == "function" then
+            local v = gethwid()
+            if type(v) == "string" and v ~= "" then id = v end
+        end
+    end)
+    if id then return id end
+    pcall(function()
+        if type(get_hwid) == "function" then
+            local v = get_hwid()
+            if type(v) == "string" and v ~= "" then id = v end
+        end
+    end)
+    if id then return id end
+    pcall(function()
+        if type(syn) == "table" and type(syn.gethwid) == "function" then
+            local v = syn.gethwid()
+            if type(v) == "string" and v ~= "" then id = v end
+        end
+    end)
+    if id then return id end
+    -- weak fallback (not secure): executor+user composite
+    local ex = "unknown"
+    pcall(function()
+        if type(identifyexecutor) == "function" then
+            ex = tostring(identifyexecutor())
+        end
+    end)
+    return string.format("fallback-%s-%s", tostring(LP.UserId), ex)
+end
+
+local function getRequestFn()
+    if type(request) == "function" then return request end
+    if type(http_request) == "function" then return http_request end
+    if type(syn) == "table" and type(syn.request) == "function" then return syn.request end
+    if type(fluxus) == "table" and type(fluxus.request) == "function" then return fluxus.request end
+    return nil
+end
+
+local function readKeyCache()
+    if not hasFileAPI() then return nil end
+    local raw = readFileIfExists(KEYSYS_CACHE_FILE)
+    if not raw then return nil end
+    local ok, obj = pcall(function()
+        return HttpService:JSONDecode(raw)
+    end)
+    if ok and type(obj) == "table" then
+        return obj
+    end
+    return nil
+end
+
+local function writeKeyCache(keyText)
+    if not hasFileAPI() or type(keyText) ~= "string" or keyText == "" then return end
+    ensureIceLuaConfigDir()
+    local ok, raw = pcall(function()
+        return HttpService:JSONEncode({
+            key = keyText,
+            savedAt = os.time(),
+        })
+    end)
+    if ok and type(raw) == "string" then
+        pcall(function() writefile(KEYSYS_CACHE_FILE, raw) end)
+    end
+end
+
+local function verifyKeyWithServer(keyText)
+    if type(keyText) ~= "string" or keyText == "" then
+        return false, "키를 입력하세요."
+    end
+    if type(KEYSYS_API_URL) ~= "string" or KEYSYS_API_URL == "" or string.find(KEYSYS_API_URL, "YOUR%-RAILWAY%-URL", 1, false) then
+        return false, "KEYSYS_API_URL을 Railway 주소로 바꿔주세요."
+    end
+
+    local req = getRequestFn()
+    if not req then
+        return false, "request API를 지원하지 않는 실행기입니다."
+    end
+
+    local body = {
+        key = keyText,
+        hwid = getBestHWID(),
+        userId = LP.UserId,
+        placeId = game.PlaceId,
+        gameId = game.GameId,
+    }
+
+    local payloadOk, payload = pcall(function()
+        return HttpService:JSONEncode(body)
+    end)
+    if not payloadOk or type(payload) ~= "string" then
+        return false, "요청 데이터 생성 실패"
+    end
+
+    local ok, resp = pcall(function()
+        return req({
+            Url = KEYSYS_API_URL,
+            Method = "POST",
+            Headers = {
+                ["Content-Type"] = "application/json",
+                ["Accept"] = "application/json",
+            },
+            Body = payload,
+        })
+    end)
+    if not ok or type(resp) ~= "table" then
+        return false, "서버 요청 실패"
+    end
+
+    local status = tonumber(resp.StatusCode) or tonumber(resp.Status) or 0
+    local text = resp.Body or resp.body or ""
+    local parsed = nil
+    if type(text) == "string" and text ~= "" then
+        pcall(function()
+            parsed = HttpService:JSONDecode(text)
+        end)
+    end
+
+    if status >= 200 and status < 300 then
+        if type(parsed) == "table" then
+            if parsed.ok == true or parsed.success == true or parsed.allowed == true then
+                return true, tostring(parsed.message or "인증 성공")
+            end
+            return false, tostring(parsed.message or "인증 실패")
+        end
+        return true, "인증 성공"
+    end
+
+    if type(parsed) == "table" and type(parsed.message) == "string" and parsed.message ~= "" then
+        return false, parsed.message
+    end
+    return false, "인증 실패 (" .. tostring(status) .. ")"
+end
+
 local gui = Instance.new("ScreenGui")
 gui.Name = "SimpleDraggableToggleUI"
 gui.ResetOnSpawn = false
@@ -1335,6 +1476,117 @@ toggleBtn.AutoButtonColor = true
 local btnCorner = Instance.new("UICorner")
 btnCorner.CornerRadius = UDim.new(0, 8)
 btnCorner.Parent = toggleBtn
+
+-- Key auth gate UI (shown first)
+local authGate = Instance.new("Frame")
+authGate.Name = "AuthGate"
+authGate.Parent = gui
+authGate.Size = UDim2.new(0, 360, 0, 170)
+authGate.Position = UDim2.new(0.5, -180, 0.5, -85)
+authGate.BackgroundColor3 = Color3.fromRGB(28, 28, 35)
+authGate.BorderSizePixel = 1
+authGate.BorderColor3 = Color3.fromRGB(80, 80, 100)
+authGate.ZIndex = 1000
+Instance.new("UICorner", authGate).CornerRadius = UDim.new(0, 8)
+
+local authTitle = Instance.new("TextLabel")
+authTitle.Parent = authGate
+authTitle.Size = UDim2.new(1, -16, 0, 24)
+authTitle.Position = UDim2.new(0, 8, 0, 8)
+authTitle.BackgroundTransparency = 1
+authTitle.TextColor3 = Color3.fromRGB(235, 235, 245)
+authTitle.Font = Enum.Font.GothamBold
+authTitle.TextSize = 13
+authTitle.TextXAlignment = Enum.TextXAlignment.Left
+authTitle.Text = "Key Verification"
+authTitle.ZIndex = 1001
+
+local authInput = Instance.new("TextBox")
+authInput.Parent = authGate
+authInput.Size = UDim2.new(1, -16, 0, 32)
+authInput.Position = UDim2.new(0, 8, 0, 42)
+authInput.BackgroundColor3 = Color3.fromRGB(45, 45, 60)
+authInput.BorderSizePixel = 0
+authInput.ClearTextOnFocus = false
+authInput.PlaceholderText = "여기에 키를 입력하세요"
+authInput.Text = ""
+authInput.TextColor3 = Color3.fromRGB(240, 240, 248)
+authInput.Font = Enum.Font.Gotham
+authInput.TextSize = 12
+authInput.ZIndex = 1001
+Instance.new("UICorner", authInput).CornerRadius = UDim.new(0, 6)
+
+local authBtn = Instance.new("TextButton")
+authBtn.Parent = authGate
+authBtn.Size = UDim2.new(1, -16, 0, 30)
+authBtn.Position = UDim2.new(0, 8, 0, 82)
+authBtn.BackgroundColor3 = Color3.fromRGB(72, 94, 180)
+authBtn.BorderSizePixel = 0
+authBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+authBtn.Font = Enum.Font.GothamBold
+authBtn.TextSize = 12
+authBtn.Text = "Verify Key"
+authBtn.ZIndex = 1001
+Instance.new("UICorner", authBtn).CornerRadius = UDim.new(0, 6)
+
+local authMsg = Instance.new("TextLabel")
+authMsg.Parent = authGate
+authMsg.Size = UDim2.new(1, -16, 0, 36)
+authMsg.Position = UDim2.new(0, 8, 0, 120)
+authMsg.BackgroundTransparency = 1
+authMsg.TextColor3 = Color3.fromRGB(200, 200, 215)
+authMsg.Font = Enum.Font.Gotham
+authMsg.TextSize = 11
+authMsg.TextWrapped = true
+authMsg.TextXAlignment = Enum.TextXAlignment.Left
+authMsg.TextYAlignment = Enum.TextYAlignment.Top
+authMsg.Text = "키를 입력하고 Verify를 누르세요."
+authMsg.ZIndex = 1001
+
+local function setMainUnlocked(unlocked)
+    keyAuthPassed = unlocked and true or false
+    main.Visible = keyAuthPassed
+    toggleBtn.Visible = keyAuthPassed
+    authGate.Visible = not keyAuthPassed
+end
+
+setMainUnlocked(false)
+
+do
+    local cache = readKeyCache()
+    if type(cache) == "table" and type(cache.key) == "string" and cache.key ~= "" then
+        authInput.Text = cache.key
+    end
+end
+
+local authBusy = false
+local function runKeyVerify()
+    if authBusy then return end
+    authBusy = true
+    authBtn.Text = "Checking..."
+    authBtn.BackgroundColor3 = Color3.fromRGB(88, 88, 108)
+    local ok, message = verifyKeyWithServer(authInput.Text)
+    if ok then
+        writeKeyCache(authInput.Text)
+        authMsg.TextColor3 = Color3.fromRGB(120, 220, 140)
+        authMsg.Text = "인증 성공. UI를 엽니다."
+        setMainUnlocked(true)
+    else
+        authMsg.TextColor3 = Color3.fromRGB(230, 120, 120)
+        authMsg.Text = tostring(message or "인증 실패")
+        setMainUnlocked(false)
+    end
+    authBtn.Text = "Verify Key"
+    authBtn.BackgroundColor3 = Color3.fromRGB(72, 94, 180)
+    authBusy = false
+end
+
+authBtn.MouseButton1Click:Connect(runKeyVerify)
+authInput.FocusLost:Connect(function(enterPressed)
+    if enterPressed then
+        runKeyVerify()
+    end
+end)
 
 -- Drag logic (top bar drag)
 local dragging = false
