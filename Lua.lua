@@ -414,7 +414,7 @@ local function readSettings()
     return nil
 end
 
--- Key system (server verify: key + hwid)
+-- Key system (server verify: key + hwid; IP는 서버가 요청에서 읽어 묶음)
 local KEYSYS_API_URL = "https://lua-key-server-production.up.railway.app/verify"
 local KEYSYS_CACHE_FILE = SETTINGS_REL_DIR .. "/Simple_Draggable_Toggle_UI_KeyCache.json"
 local keyAuthPassed = false
@@ -565,7 +565,12 @@ pcall(function()
     gui.Parent = game:GetService("CoreGui")
 end)
 if not gui.Parent then
-    gui.Parent = LP:WaitForChild("PlayerGui")
+    local pg = LP:WaitForChild("PlayerGui", 30)
+    if pg then
+        gui.Parent = pg
+    else
+        warn("[SimpleDraggableToggleUI] PlayerGui 없음(30초). UI 부착 실패.")
+    end
 end
 pcall(function() gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling end)
 
@@ -824,7 +829,7 @@ local distanceSlider = createSlider(main, 218, "Orbit Distance", 2, 700000, tpRa
     tpRadius = v
 end)
 
-local intervalSlider = createSlider(main, 268, "Orbit TP Time", 0.0002, 1.5, tpInterval, 4, function(v)
+local intervalSlider = createSlider(main, 268, "Orbit TP Time", 0.0001, 1.5, tpInterval, 4, function(v)
     tpInterval = v
 end)
 
@@ -2240,7 +2245,7 @@ local function startOrbit()
         if patternName == "Random spot" then
             local spd = math.max(orbitSpeed, 1)
             stepInterval = tpInterval * (95 / spd)
-            stepInterval = math.clamp(stepInterval, 0.00015, 2)
+            stepInterval = math.clamp(stepInterval, 0.000001, 2)
         end
 
         tpAccumulator = tpAccumulator + dt
