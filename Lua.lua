@@ -1,5 +1,3 @@
-print("w")
-
 
 
 
@@ -554,6 +552,9 @@ local function verifyKeyWithServer(keyText)
     end
     return false, "인증 실패 (" .. tostring(status) .. ")"
 end
+
+local U = {}
+local function buildMainUI()
 
 local gui = Instance.new("ScreenGui")
 gui.Name = "SimpleDraggableToggleUI"
@@ -1673,13 +1674,22 @@ local function pickHitUnderRoot(root, objs, pos)
     return nil
 end
 
-UIS.InputBegan:Connect(function(input, gameProcessed)
-    if gameProcessed then return end
+UIS.InputBegan:Connect(function(input, _gameProcessed)
+    -- UI 위 클릭은 gameProcessed가 true로 오는 경우가 많아서 여기서는 막지 않음
     if input.UserInputType ~= Enum.UserInputType.MouseButton1
         and input.UserInputType ~= Enum.UserInputType.Touch then
         return
     end
+    local typing = false
+    pcall(function()
+        typing = GuiService:GetFocusedTextBox() ~= nil
+    end)
+    if typing then return end
+
     local pos = input.Position
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        pos = UIS:GetMouseLocation()
+    end
     local objs = GuiService:GetGuiObjectsAtPosition(pos)
 
     if authGate.Visible then
@@ -1737,23 +1747,43 @@ end)
 aaTabBtn.MouseButton1Click:Connect(function()
     aaPanel.Visible = not aaPanel.Visible
 end)
-local function getMyHumanoid()
-    local ch = LP.Character
-    if not ch then return nil end
-    return ch:FindFirstChildOfClass("Humanoid")
+    U.loadCfgBtn = loadCfgBtn
+    U.gui = gui
+    U.saveCfgBtn = saveCfgBtn
+    U.voidBtn = voidBtn
+    U.orbitBtn = orbitBtn
+    U.espBtn = espBtn
+    U.aaSpecialBtn = aaSpecialBtn
+    U.playerListFrame = playerListFrame
+    U.targetLabel = targetLabel
+    U.refreshKeyBindUI = refreshKeyBindUI
+    U.orbitPatternBtn = orbitPatternBtn
+    U.crouchBtn = crouchBtn
+    U.aaSpinBtn = aaSpinBtn
+    U.aaRollBtn = aaRollBtn
+    U.aaPitchBtn = aaPitchBtn
+    U.aaIgnoreACBtn = aaIgnoreACBtn
+    U.aaHardModeBtn = aaHardModeBtn
+    U.voidHideSlider = voidHideSlider
+    U.voidAttackSlider = voidAttackSlider
+    U.tpSpeedSlider = tpSpeedSlider
+    U.tpRadSlider = tpRadSlider
+    U.tpHeightSlider = tpHeightSlider
+    U.stopTP = stopTP
+    U.stopMoving = stopMoving
+    U.startTP = startTP
+    U.startMoving = startMoving
+    U.speedSlider = speedSlider
+    U.listLayout = listLayout
+    U.refreshTargetBtn = refreshTargetBtn
+    U.intervalSlider = intervalSlider
+    U.distanceSlider = distanceSlider
+    U.crouchTempoSlider = crouchTempoSlider
+    U.crouchDepthSlider = crouchDepthSlider
+    U.aaSpinSlider = aaSpinSlider
+    U.aaRollSlider = aaRollSlider
 end
-
-local function getMyHRP()
-    local ch = LP.Character
-    if not ch then return nil end
-    return ch:FindFirstChild("HumanoidRootPart")
-end
-
-local function getMyHumanoid()
-    local ch = LP.Character
-    if not ch then return nil end
-    return ch:FindFirstChildOfClass("Humanoid")
-end
+buildMainUI()
 
 local function getOrbitOffset(patternName, angle, radius)
     local r = math.max(radius, 0.001)
@@ -1839,15 +1869,15 @@ local function stopESP()
         if v.gui then v.gui:Destroy() end
     end
     espPool = {}
-    espBtn.Text = "ESP: OFF"
-    espBtn.BackgroundColor3 = Color3.fromRGB(42, 96, 72)
+    U.espBtn.Text = "ESP: OFF"
+    U.espBtn.BackgroundColor3 = Color3.fromRGB(42, 96, 72)
 end
 
 local function startESP()
     if espConn then espConn:Disconnect() end
     espEnabled = true
-    espBtn.Text = "ESP: ON"
-    espBtn.BackgroundColor3 = Color3.fromRGB(65, 148, 106)
+    U.espBtn.Text = "ESP: ON"
+    U.espBtn.BackgroundColor3 = Color3.fromRGB(65, 148, 106)
 
     espConn = RunService.RenderStepped:Connect(function()
         if not espEnabled then return end
@@ -2265,8 +2295,8 @@ local function stopOrbit()
         orbitConn:Disconnect()
         orbitConn = nil
     end
-    orbitBtn.Text = orbitBtnLabel(false)
-    orbitBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 78)
+    U.orbitBtn.Text = orbitBtnLabel(false)
+    U.orbitBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 78)
 end
  
 -- (Silent Aim core removed)
@@ -2274,8 +2304,8 @@ end
 local function startOrbit()
     if orbitConn then orbitConn:Disconnect() end
     orbitEnabled = true
-    orbitBtn.Text = orbitBtnLabel(true)
-    orbitBtn.BackgroundColor3 = Color3.fromRGB(95, 75, 190)
+    U.orbitBtn.Text = orbitBtnLabel(true)
+    U.orbitBtn.BackgroundColor3 = Color3.fromRGB(95, 75, 190)
 
     tpAccumulator = 0
     orbitConn = RunService.Heartbeat:Connect(function(dt)
@@ -2327,7 +2357,7 @@ local function startOrbit()
     end)
 end
 
-orbitBtn.MouseButton1Click:Connect(function()
+U.orbitBtn.MouseButton1Click:Connect(function()
     if orbitEnabled then
         stopOrbit()
     else
@@ -2335,10 +2365,10 @@ orbitBtn.MouseButton1Click:Connect(function()
     end
 end)
 
-orbitPatternBtn.MouseButton1Click:Connect(function()
+U.orbitPatternBtn.MouseButton1Click:Connect(function()
     orbitPatternIndex = orbitPatternIndex + 1
     if orbitPatternIndex > #orbitPatterns then orbitPatternIndex = 1 end
-    orbitPatternBtn.Text = "Orbit Pattern: " .. (orbitPatterns[orbitPatternIndex])
+    U.orbitPatternBtn.Text = "Orbit Pattern: " .. (orbitPatterns[orbitPatternIndex])
 end)
 
 local function findTargetPlayer(nameText)
@@ -2387,7 +2417,7 @@ local playerButtons = {}
 
 local function clearPlayerListButtons()
     playerButtons = {}
-    for _, child in ipairs(playerListFrame:GetChildren()) do
+    for _, child in ipairs(U.playerListFrame:GetChildren()) do
         if child:IsA("TextButton") then
             child:Destroy()
         end
@@ -2410,7 +2440,7 @@ local function rebuildPlayerListUI()
     clearPlayerListButtons()
     if #targetList == 0 then
         local empty = Instance.new("TextLabel")
-        empty.Parent = playerListFrame
+        empty.Parent = U.playerListFrame
         empty.Size = UDim2.new(1, -8, 0, 22)
         empty.BackgroundTransparency = 1
         empty.Text = "No players"
@@ -2421,7 +2451,7 @@ local function rebuildPlayerListUI()
     else
         for i, p in ipairs(targetList) do
             local btn = Instance.new("TextButton")
-            btn.Parent = playerListFrame
+            btn.Parent = U.playerListFrame
             btn.Size = UDim2.new(1, -8, 0, 22)
             btn.BackgroundColor3 = Color3.fromRGB(56, 56, 74)
             btn.BorderSizePixel = 0
@@ -2435,15 +2465,15 @@ local function rebuildPlayerListUI()
             playerButtons[p.Name] = btn
             btn.MouseButton1Click:Connect(function()
                 selectedTargetName = p.Name
-                targetLabel.Text = "Target: " .. selectedTargetName
+                U.targetLabel.Text = "Target: " .. selectedTargetName
                 updatePlayerButtonHighlights()
             end)
         end
     end
 
     task.defer(function()
-        local y = listLayout.AbsoluteContentSize.Y
-        playerListFrame.CanvasSize = UDim2.new(0, 0, 0, y + 6)
+        local y = U.listLayout.AbsoluteContentSize.Y
+        U.playerListFrame.CanvasSize = UDim2.new(0, 0, 0, y + 6)
         updatePlayerButtonHighlights()
     end)
 end
@@ -2461,7 +2491,7 @@ local function rebuildTargetList()
     if #targetList == 0 then
         selectedTargetName = ""
         targetIndex = 0
-        targetLabel.Text = "Target: None"
+        U.targetLabel.Text = "Target: None"
         rebuildPlayerListUI()
         return
     end
@@ -2480,7 +2510,7 @@ local function rebuildTargetList()
         end
         selectedTargetName = targetList[targetIndex].Name
     end
-    targetLabel.Text = "Target: " .. selectedTargetName
+    U.targetLabel.Text = "Target: " .. selectedTargetName
     rebuildPlayerListUI()
 end
 
@@ -2582,8 +2612,8 @@ end
 local function stopVoid()
     voidEnabled = false
     voidThread = nil
-    voidBtn.Text = voidBtnLabel(false)
-    voidBtn.BackgroundColor3 = Color3.fromRGB(42, 62, 96)
+    U.voidBtn.Text = voidBtnLabel(false)
+    U.voidBtn.BackgroundColor3 = Color3.fromRGB(42, 62, 96)
     pcall(function()
         UIS.MouseBehavior = Enum.MouseBehavior.Default
     end)
@@ -2593,8 +2623,8 @@ end
 
 local function startVoid()
     voidEnabled = true
-    voidBtn.Text = voidBtnLabel(true)
-    voidBtn.BackgroundColor3 = Color3.fromRGB(78, 112, 200)
+    U.voidBtn.Text = voidBtnLabel(true)
+    U.voidBtn.BackgroundColor3 = Color3.fromRGB(78, 112, 200)
 
     local thisThread = {}
     voidThread = thisThread
@@ -2707,23 +2737,23 @@ end
 local function applyConfig(cfg)
     if type(cfg) ~= "table" then return false end
 
-    if type(cfg.orbitSpeed) == "number" then speedSlider.setValue(cfg.orbitSpeed) end
-    if type(cfg.tpRadius) == "number" then distanceSlider.setValue(cfg.tpRadius) end
-    if type(cfg.tpInterval) == "number" then intervalSlider.setValue(cfg.tpInterval) end
+    if type(cfg.orbitSpeed) == "number" then U.speedSlider.setValue(cfg.orbitSpeed) end
+    if type(cfg.tpRadius) == "number" then U.distanceSlider.setValue(cfg.tpRadius) end
+    if type(cfg.tpInterval) == "number" then U.intervalSlider.setValue(cfg.tpInterval) end
 	-- uiScale removed
     if type(cfg.orbitPatternIndex) == "number" then
         orbitPatternIndex = math.clamp(math.floor(cfg.orbitPatternIndex), 1, #orbitPatterns)
-        orbitPatternBtn.Text = "Orbit Pattern: " .. (orbitPatterns[orbitPatternIndex])
+        U.orbitPatternBtn.Text = "Orbit Pattern: " .. (orbitPatterns[orbitPatternIndex])
     end
 	-- TP params
-	if type(cfg.tp2Height) == "number" then tpHeightSlider.setValue(cfg.tp2Height) end
-	if type(cfg.tp2Radius) == "number" then tpRadSlider.setValue(cfg.tp2Radius) end
-	if type(cfg.tp2Speed) == "number" then tpSpeedSlider.setValue(cfg.tp2Speed) end
-    if type(cfg.voidHideTime) == "number" then voidHideSlider.setValue(cfg.voidHideTime) end
-    if type(cfg.voidAttackTime) == "number" then voidAttackSlider.setValue(cfg.voidAttackTime) end
+	if type(cfg.tp2Height) == "number" then U.tpHeightSlider.setValue(cfg.tp2Height) end
+	if type(cfg.tp2Radius) == "number" then U.tpRadSlider.setValue(cfg.tp2Radius) end
+	if type(cfg.tp2Speed) == "number" then U.tpSpeedSlider.setValue(cfg.tp2Speed) end
+    if type(cfg.voidHideTime) == "number" then U.voidHideSlider.setValue(cfg.voidHideTime) end
+    if type(cfg.voidAttackTime) == "number" then U.voidAttackSlider.setValue(cfg.voidAttackTime) end
     -- Moving params
-	if type(cfg.mvCrouchTempo) == "number" then crouchTempoSlider.setValue(cfg.mvCrouchTempo) end
-	if type(cfg.mvCrouchDepth) == "number" then crouchDepthSlider.setValue(cfg.mvCrouchDepth) end
+	if type(cfg.mvCrouchTempo) == "number" then U.crouchTempoSlider.setValue(cfg.mvCrouchTempo) end
+	if type(cfg.mvCrouchDepth) == "number" then U.crouchDepthSlider.setValue(cfg.mvCrouchDepth) end
 
     if type(cfg.selectedTargetName) == "string" then
         selectedTargetName = cfg.selectedTargetName
@@ -2748,60 +2778,60 @@ local function applyConfig(cfg)
         if st.voidEnabled then startVoid() else stopVoid() end
         if st.espEnabled then startESP() else stopESP() end
         if type(st.mvEnabled) == "boolean" then
-            if st.mvEnabled then startMoving() else stopMoving() end
+            if st.mvEnabled then U.startMoving() else U.stopMoving() end
         end
 		if type(st.mvCrouchSpamOn) == "boolean" then
 			mvCrouchSpamOn = st.mvCrouchSpamOn
-			if crouchBtn and crouchBtn.Parent then
-				crouchBtn.Text = mvCrouchSpamOn and "Crouch Spam: ON" or "Crouch Spam: OFF"
+			if U.crouchBtn and U.crouchBtn.Parent then
+				U.crouchBtn.Text = mvCrouchSpamOn and "Crouch Spam: ON" or "Crouch Spam: OFF"
 			end
 		end
         if type(st.aaPitchMode) == "string" then
             aaPitchMode = st.aaPitchMode
-            aaPitchBtn.Text = "Pitch: " .. (aaPitchMode == "Off" and "Off" or aaPitchMode)
+            U.aaPitchBtn.Text = "Pitch: " .. (aaPitchMode == "Off" and "Off" or aaPitchMode)
         end
         if type(st.aaSpinOn) == "boolean" then
             aaSpinOn = st.aaSpinOn
-            aaSpinBtn.Text = aaSpinOn and "Spin: ON" or "Spin: OFF"
+            U.aaSpinBtn.Text = aaSpinOn and "Spin: ON" or "Spin: OFF"
         end
         if type(st.aaSpinSpeed) == "number" then
             aaSpinSpeed = st.aaSpinSpeed
-            aaSpinSlider.setValue(aaSpinSpeed)
+            U.aaSpinSlider.setValue(aaSpinSpeed)
         end
         if type(st.aaRollOn) == "boolean" then
             aaRollOn = st.aaRollOn
-            aaRollBtn.Text = aaRollOn and "Roll: ON" or "Roll: Off"
+            U.aaRollBtn.Text = aaRollOn and "Roll: ON" or "Roll: Off"
         end
         if type(st.aaRollSpeed) == "number" then
             aaRollSpeed = st.aaRollSpeed
-            aaRollSlider.setValue(aaRollSpeed)
+            U.aaRollSlider.setValue(aaRollSpeed)
         end
         if type(st.aaIgnoreAC) == "boolean" then
             aaIgnoreAC = st.aaIgnoreAC
-            aaIgnoreACBtn.Text = aaIgnoreAC and "Ignore AnimationController: ON" or "Ignore AnimationController: OFF"
+            U.aaIgnoreACBtn.Text = aaIgnoreAC and "Ignore AnimationController: ON" or "Ignore AnimationController: OFF"
         end
         if type(st.aaHardMode) == "boolean" then
             aaHardMode = st.aaHardMode
-            aaHardModeBtn.Text = aaHardMode and "Hard Mode: ON" or "Hard Mode: OFF"
+            U.aaHardModeBtn.Text = aaHardMode and "Hard Mode: ON" or "Hard Mode: OFF"
         end
         if type(st.aaSpecialMode) == "string" then
             aaSpecialMode = st.aaSpecialMode
-            if aaSpecialBtn and aaSpecialBtn.Parent then
-                aaSpecialBtn.Text = "Special: " .. aaSpecialMode
+            if U.aaSpecialBtn and U.aaSpecialBtn.Parent then
+                U.aaSpecialBtn.Text = "Special: " .. aaSpecialMode
             end
         end
 		if type(st.tp2Enabled) == "boolean" then
-			if st.tp2Enabled then startTP() else stopTP() end
+			if st.tp2Enabled then U.startTP() else U.stopTP() end
 		end
         startAntiAim()
     end
-    refreshKeyBindUI()
+    U.refreshKeyBindUI()
     return true
 end
 
 -- Rage binding removed
 
-voidBtn.MouseButton1Click:Connect(function()
+U.voidBtn.MouseButton1Click:Connect(function()
     if voidEnabled then
         stopVoid()
     else
@@ -2815,7 +2845,7 @@ UIS.InputBegan:Connect(function(input, _gameProcessed)
         if keybindCaptureMode then
             if k == Enum.KeyCode.Escape then
                 keybindCaptureMode = nil
-                refreshKeyBindUI()
+                U.refreshKeyBindUI()
                 return
             end
             if k == Enum.KeyCode.Unknown then
@@ -2833,7 +2863,7 @@ UIS.InputBegan:Connect(function(input, _gameProcessed)
                 KEYBIND_VOID_TOGGLE = k
             end
             keybindCaptureMode = nil
-            refreshKeyBindUI()
+            U.refreshKeyBindUI()
             return
         end
     end
@@ -2869,7 +2899,7 @@ end)
 
 -- In Void binding removed
 
-espBtn.MouseButton1Click:Connect(function()
+U.espBtn.MouseButton1Click:Connect(function()
     if espEnabled then
         stopESP()
     else
@@ -2877,52 +2907,52 @@ espBtn.MouseButton1Click:Connect(function()
     end
 end)
 
-saveCfgBtn.MouseButton1Click:Connect(function()
+U.saveCfgBtn.MouseButton1Click:Connect(function()
     local ok, savedToDisk = writeSettings(collectConfig())
     if ok then
-        saveCfgBtn.Text = savedToDisk and "Save Config (Done)" or "Save OK (메모리만)"
+        U.saveCfgBtn.Text = savedToDisk and "Save Config (Done)" or "Save OK (메모리만)"
     else
-        saveCfgBtn.Text = "Save Config (Fail)"
+        U.saveCfgBtn.Text = "Save Config (Fail)"
     end
     task.delay(1.2, function()
-        if saveCfgBtn and saveCfgBtn.Parent then
-            saveCfgBtn.Text = "Save Config"
+        if U.saveCfgBtn and U.saveCfgBtn.Parent then
+            U.saveCfgBtn.Text = "Save Config"
         end
     end)
 end)
 
-loadCfgBtn.MouseButton1Click:Connect(function()
+U.loadCfgBtn.MouseButton1Click:Connect(function()
     local cfg = readSettings()
     if not cfg then
-        loadCfgBtn.Text = "Load: 없음"
+        U.loadCfgBtn.Text = "Load: 없음"
         task.delay(1.2, function()
-            if loadCfgBtn and loadCfgBtn.Parent then
-                loadCfgBtn.Text = "Load Config"
+            if U.loadCfgBtn and U.loadCfgBtn.Parent then
+                U.loadCfgBtn.Text = "Load Config"
             end
         end)
         return
     end
     local ok = applyConfig(cfg)
     if ok then
-        loadCfgBtn.Text = "Load Config (Done)"
+        U.loadCfgBtn.Text = "Load Config (Done)"
     else
-        loadCfgBtn.Text = "Load: 오류"
+        U.loadCfgBtn.Text = "Load: 오류"
     end
     task.delay(1.2, function()
-        if loadCfgBtn and loadCfgBtn.Parent then
-            loadCfgBtn.Text = "Load Config"
+        if U.loadCfgBtn and U.loadCfgBtn.Parent then
+            U.loadCfgBtn.Text = "Load Config"
         end
     end)
 end)
 
 -- Anti-Aim UI bindings
-aaPitchBtn.MouseButton1Click:Connect(function()
+U.aaPitchBtn.MouseButton1Click:Connect(function()
     local order = {"Off","UpsideDown","BackHead","NoHead","Jitter","ZeroG","Sway","Nod","Shake","WavePitch","Bounce","SpiralPitch","Pulse","RandomStep","MicroJitter","TiltLeft","TiltRight"}
     local idx = 1
     for i,v in ipairs(order) do if v==aaPitchMode then idx=i break end end
     idx = (idx % #order) + 1
     aaPitchMode = order[idx]
-    aaPitchBtn.Text = "Pitch: " .. aaPitchMode
+    U.aaPitchBtn.Text = "Pitch: " .. aaPitchMode
     if aaPitchMode == "Off" and not aaSpinOn and not aaRollOn then
         stopAntiAim()
     else
@@ -2937,9 +2967,9 @@ end)
  
 -- (Silent Aim removed)
 
-aaSpinBtn.MouseButton1Click:Connect(function()
+U.aaSpinBtn.MouseButton1Click:Connect(function()
     aaSpinOn = not aaSpinOn
-    aaSpinBtn.Text = aaSpinOn and "Spin: ON" or "Spin: OFF"
+    U.aaSpinBtn.Text = aaSpinOn and "Spin: ON" or "Spin: OFF"
     if aaPitchMode == "Off" and not aaSpinOn and not aaRollOn then
         stopAntiAim()
     else
@@ -2947,9 +2977,9 @@ aaSpinBtn.MouseButton1Click:Connect(function()
     end
 end)
 
-aaRollBtn.MouseButton1Click:Connect(function()
+U.aaRollBtn.MouseButton1Click:Connect(function()
     aaRollOn = not aaRollOn
-    aaRollBtn.Text = aaRollOn and "Roll: ON" or "Roll: Off"
+    U.aaRollBtn.Text = aaRollOn and "Roll: ON" or "Roll: Off"
     if aaPitchMode == "Off" and not aaSpinOn and not aaRollOn then
         stopAntiAim()
     else
@@ -2957,35 +2987,35 @@ aaRollBtn.MouseButton1Click:Connect(function()
     end
 end)
 
-aaHardModeBtn.MouseButton1Click:Connect(function()
+U.aaHardModeBtn.MouseButton1Click:Connect(function()
     aaHardMode = not aaHardMode
-    aaHardModeBtn.Text = aaHardMode and "Hard Mode: ON" or "Hard Mode: OFF"
+    U.aaHardModeBtn.Text = aaHardMode and "Hard Mode: ON" or "Hard Mode: OFF"
     if aaPitchMode ~= "Off" or aaSpinOn or aaRollOn then
         startAntiAim()
     end
 end)
 
-aaIgnoreACBtn.MouseButton1Click:Connect(function()
+U.aaIgnoreACBtn.MouseButton1Click:Connect(function()
     aaIgnoreAC = not aaIgnoreAC
-    aaIgnoreACBtn.Text = aaIgnoreAC and "Ignore AnimationController: ON" or "Ignore AnimationController: OFF"
+    U.aaIgnoreACBtn.Text = aaIgnoreAC and "Ignore AnimationController: ON" or "Ignore AnimationController: OFF"
     if aaPitchMode ~= "Off" or aaSpinOn or aaRollOn then
         startAntiAim()
     end
 end)
 
-aaSpecialBtn.MouseButton1Click:Connect(function()
+U.aaSpecialBtn.MouseButton1Click:Connect(function()
     local order = {"Off","Forward","Backward","Chaos"}
     local idx = 1
     for i,v in ipairs(order) do if v==aaSpecialMode then idx=i break end end
     idx = (idx % #order) + 1
     aaSpecialMode = order[idx]
-    aaSpecialBtn.Text = "Special: " .. aaSpecialMode
+    U.aaSpecialBtn.Text = "Special: " .. aaSpecialMode
     if aaPitchMode ~= "Off" or aaSpinOn or aaRollOn or aaSpecialMode ~= "Off" then
         startAntiAim()
     end
 end)
 
-refreshTargetBtn.MouseButton1Click:Connect(function()
+U.refreshTargetBtn.MouseButton1Click:Connect(function()
     rebuildTargetList()
 end)
 
