@@ -458,6 +458,17 @@ local function getRequestFn()
     return nil
 end
 
+-- keys.txt 등 "ICE-XXXX / 닉메모" 형태는 검증·저장 시 앞의 키만 사용 (뒤 / 주석은 넣지 않음)
+local function normalizeKeyInput(s)
+    if type(s) ~= "string" then return "" end
+    s = string.gsub(s, "^%s+", "")
+    s = string.gsub(s, "%s+$", "")
+    s = string.gsub(s, "%s+/.+$", "")
+    s = string.gsub(s, "^%s+", "")
+    s = string.gsub(s, "%s+$", "")
+    return s
+end
+
 local function readKeyCache()
     if not hasFileAPI() then return nil end
     local raw = readFileIfExists(KEYSYS_CACHE_FILE)
@@ -472,6 +483,7 @@ local function readKeyCache()
 end
 
 local function writeKeyCache(keyText)
+    keyText = normalizeKeyInput(keyText)
     if not hasFileAPI() or type(keyText) ~= "string" or keyText == "" then return end
     ensureIceLuaConfigDir()
     local ok, raw = pcall(function()
@@ -486,6 +498,7 @@ local function writeKeyCache(keyText)
 end
 
 local function verifyKeyWithServer(keyText)
+    keyText = normalizeKeyInput(keyText)
     if type(keyText) ~= "string" or keyText == "" then
         return false, "키를 입력하세요."
     end
@@ -1567,7 +1580,7 @@ setMainUnlocked(false)
 do
     local cache = readKeyCache()
     if type(cache) == "table" and type(cache.key) == "string" and cache.key ~= "" then
-        authInput.Text = cache.key
+        authInput.Text = normalizeKeyInput(cache.key)
     end
 end
 
@@ -1577,9 +1590,11 @@ local function runKeyVerify()
     authBusy = true
     authBtn.Text = "Checking..."
     authBtn.BackgroundColor3 = Color3.fromRGB(88, 88, 108)
-    local ok, message = verifyKeyWithServer(authInput.Text)
+    local keyClean = normalizeKeyInput(authInput.Text)
+    local ok, message = verifyKeyWithServer(keyClean)
     if ok then
-        writeKeyCache(authInput.Text)
+        authInput.Text = keyClean
+        writeKeyCache(keyClean)
         authMsg.TextColor3 = Color3.fromRGB(120, 220, 140)
         authMsg.Text = "인증 성공. UI를 엽니다."
         setMainUnlocked(true)
