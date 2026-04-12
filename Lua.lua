@@ -1653,6 +1653,26 @@ local function guiBlocksMainDrag(inst)
     return false
 end
 
+-- 클릭이 비활성 TextLabel 등에 걸려 맨 위 객체가 main 밖으로 나가도, root 화면 안이면 드래그로 잡기
+local function pickHitUnderRoot(root, objs, pos)
+    if objs then
+        for _, o in ipairs(objs) do
+            if o:IsDescendantOf(root) then
+                return o
+            end
+        end
+    end
+    local ap = root.AbsolutePosition
+    local sz = root.AbsoluteSize
+    if sz.X <= 0 or sz.Y <= 0 then
+        return nil
+    end
+    if pos.X >= ap.X and pos.X <= ap.X + sz.X and pos.Y >= ap.Y and pos.Y <= ap.Y + sz.Y then
+        return root
+    end
+    return nil
+end
+
 UIS.InputBegan:Connect(function(input, gameProcessed)
     if gameProcessed then return end
     if input.UserInputType ~= Enum.UserInputType.MouseButton1
@@ -1661,21 +1681,23 @@ UIS.InputBegan:Connect(function(input, gameProcessed)
     end
     local pos = input.Position
     local objs = GuiService:GetGuiObjectsAtPosition(pos)
-    if not objs or #objs == 0 then return end
-    local hit = objs[1]
-    if not hit then return end
 
-    if authGate.Visible and hit:IsDescendantOf(authGate) then
-        if guiBlocksAuthDrag(hit) then return end
-        authDragging = true
-        authDragStart = input.Position
-        authStartPos = authGate.Position
-        return
+    if authGate.Visible then
+        local hitA = pickHitUnderRoot(authGate, objs, pos)
+        if hitA then
+            if not guiBlocksAuthDrag(hitA) then
+                authDragging = true
+                authDragStart = input.Position
+                authStartPos = authGate.Position
+            end
+            return
+        end
     end
 
     if not main.Visible then return end
-    if not hit:IsDescendantOf(main) then return end
-    if guiBlocksMainDrag(hit) then return end
+    local hitM = pickHitUnderRoot(main, objs, pos)
+    if not hitM then return end
+    if guiBlocksMainDrag(hitM) then return end
     dragging = true
     dragStart = input.Position
     startPos = main.Position
