@@ -1602,6 +1602,7 @@ end)
 
 -- Drag logic (key auth gate)
 local authDragging = false
+local authDragUsesScreenMouse = false
 local authDragStart = Vector2.new()
 local authStartPos = UDim2.new()
 
@@ -1621,7 +1622,9 @@ UIS.InputChanged:Connect(function(input)
     if input.UserInputType ~= Enum.UserInputType.MouseMovement
     and input.UserInputType ~= Enum.UserInputType.Touch then return end
 
-    local delta = input.Position - authDragStart
+    local now = authDragUsesScreenMouse and UIS:GetMouseLocation()
+        or Vector2.new(input.Position.X, input.Position.Y)
+    local delta = now - authDragStart
     authGate.Position = UDim2.new(
         authStartPos.X.Scale,
         authStartPos.X.Offset + delta.X,
@@ -1634,11 +1637,13 @@ UIS.InputEnded:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1
     or input.UserInputType == Enum.UserInputType.Touch then
         authDragging = false
+        authDragUsesScreenMouse = false
     end
 end)
 
 -- Drag logic: main 전체에서 잡기 (슬라이더/버튼/입력/스크롤 제외)
 local dragging = false
+local dragUsesScreenMouse = false
 local dragStart = Vector2.new()
 local startPos = UDim2.new()
 
@@ -1659,6 +1664,26 @@ local function pickHitUnderRoot(root, objs, pos)
     if objs then
         for _, o in ipairs(objs) do
             if o:IsDescendantOf(root) then
+                return o
+            end
+        end
+    end
+    local ap = root.AbsolutePosition
+    local sz = root.AbsoluteSize
+    if sz.X <= 0 or sz.Y <= 0 then
+        return nil
+    end
+    if pos.X >= ap.X and pos.X <= ap.X + sz.X and pos.Y >= ap.Y and pos.Y <= ap.Y + sz.Y then
+        return root
+    end
+    return nil
+end
+
+-- 같은 픽셀에 버튼·스크롤 등이 겹쳐 있으면 맨 위만 보면 드래그가 막힘 → 스택에서 '드래그 허용' 첫 타깃 또는 main 영역 폴백
+local function pickMainDragHit(root, objs, pos)
+    if objs then
+        for _, o in ipairs(objs) do
+            if o:IsDescendantOf(root) and not guiBlocksMainDrag(o) then
                 return o
             end
         end
@@ -1697,7 +1722,9 @@ UIS.InputBegan:Connect(function(input, _gameProcessed)
         if hitA then
             if not guiBlocksAuthDrag(hitA) then
                 authDragging = true
-                authDragStart = input.Position
+                authDragUsesScreenMouse = (input.UserInputType == Enum.UserInputType.MouseButton1)
+                authDragStart = authDragUsesScreenMouse and UIS:GetMouseLocation()
+                    or Vector2.new(input.Position.X, input.Position.Y)
                 authStartPos = authGate.Position
             end
             return
@@ -1705,11 +1732,12 @@ UIS.InputBegan:Connect(function(input, _gameProcessed)
     end
 
     if not main.Visible then return end
-    local hitM = pickHitUnderRoot(main, objs, pos)
+    local hitM = pickMainDragHit(main, objs, pos)
     if not hitM then return end
-    if guiBlocksMainDrag(hitM) then return end
     dragging = true
-    dragStart = input.Position
+    dragUsesScreenMouse = (input.UserInputType == Enum.UserInputType.MouseButton1)
+    dragStart = dragUsesScreenMouse and UIS:GetMouseLocation()
+        or Vector2.new(input.Position.X, input.Position.Y)
     startPos = main.Position
 end)
 
@@ -1718,7 +1746,9 @@ UIS.InputChanged:Connect(function(input)
     if input.UserInputType ~= Enum.UserInputType.MouseMovement
     and input.UserInputType ~= Enum.UserInputType.Touch then return end
 
-    local delta = input.Position - dragStart
+    local now = dragUsesScreenMouse and UIS:GetMouseLocation()
+        or Vector2.new(input.Position.X, input.Position.Y)
+    local delta = now - dragStart
     main.Position = UDim2.new(
         startPos.X.Scale,
         startPos.X.Offset + delta.X,
@@ -1731,6 +1761,7 @@ UIS.InputEnded:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1
     or input.UserInputType == Enum.UserInputType.Touch then
         dragging = false
+        dragUsesScreenMouse = false
     end
 end)
 
