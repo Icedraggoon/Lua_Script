@@ -598,6 +598,7 @@ topBar.Parent = main
 topBar.Size = UDim2.new(1, 0, 0, 32)
 topBar.BackgroundColor3 = Color3.fromRGB(45, 45, 58)
 topBar.BorderSizePixel = 0
+topBar.ZIndex = 10
 
 local topCorner = Instance.new("UICorner")
 topCorner.CornerRadius = UDim.new(0, 8)
@@ -664,10 +665,29 @@ tpTabBtn.Text = "TP"
 Instance.new("UICorner", tpTabBtn).CornerRadius = UDim.new(0, 6)
 tpTabBtn.ZIndex = 60
 
+-- 본문만 스크롤 (모바일·작은 화면). 타이틀 바는 고정.
+local mainContent = Instance.new("ScrollingFrame")
+mainContent.Name = "MainScroll"
+mainContent.Parent = main
+mainContent.BackgroundTransparency = 1
+mainContent.BorderSizePixel = 0
+mainContent.Position = UDim2.new(0, 0, 0, 32)
+mainContent.Size = UDim2.new(1, 0, 1, -32)
+mainContent.ZIndex = 1
+mainContent.ClipsDescendants = true
+mainContent.ScrollingDirection = Enum.ScrollingDirection.Y
+mainContent.ScrollBarThickness = 10
+mainContent.ScrollBarImageColor3 = Color3.fromRGB(90, 90, 115)
+mainContent.CanvasSize = UDim2.new(0, 0, 0, 780)
+mainContent.AutomaticCanvasSize = Enum.AutomaticSize.None
+pcall(function()
+	mainContent.ScrollingEnabled = true
+end)
+
 local bodyText = Instance.new("TextLabel")
-bodyText.Parent = main
+bodyText.Parent = mainContent
 bodyText.Size = UDim2.new(1, -16, 0, 34)
-bodyText.Position = UDim2.new(0, 8, 0, 40)
+bodyText.Position = UDim2.new(0, 8, 0, 8)
 bodyText.BackgroundTransparency = 1
 bodyText.TextWrapped = true
 bodyText.TextXAlignment = Enum.TextXAlignment.Left
@@ -680,9 +700,9 @@ bodyText.Text = "Draggable | Toggle Orbit/Rage"
 -- Orbit toggle (keys: left "키바인드" panel)
 local orbitBtn = Instance.new("TextButton")
 orbitBtn.Name = "OrbitToggleButton"
-orbitBtn.Parent = main
+orbitBtn.Parent = mainContent
 orbitBtn.Size = UDim2.new(0, 180, 0, 34)
-orbitBtn.Position = UDim2.new(0.5, -90, 0, 102)
+orbitBtn.Position = UDim2.new(0.5, -90, 0, 70)
 orbitBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 78)
 orbitBtn.BorderSizePixel = 0
 orbitBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -695,9 +715,9 @@ orbitCorner.CornerRadius = UDim.new(0, 8)
 orbitCorner.Parent = orbitBtn
 
 local orbitPatternBtn = Instance.new("TextButton")
-orbitPatternBtn.Parent = main
+orbitPatternBtn.Parent = mainContent
 orbitPatternBtn.Size = UDim2.new(1, -20, 0, 24)
-orbitPatternBtn.Position = UDim2.new(0, 10, 0, 138)
+orbitPatternBtn.Position = UDim2.new(0, 10, 0, 106)
 orbitPatternBtn.BackgroundColor3 = Color3.fromRGB(52, 52, 70)
 orbitPatternBtn.BorderSizePixel = 0
 orbitPatternBtn.TextColor3 = Color3.fromRGB(235, 235, 245)
@@ -821,23 +841,23 @@ end
 
 -- (removed UI Scale slider)
 
-local speedSlider = createSlider(main, 168, "Orbit Speed", 1, 4500, orbitSpeed, 0, function(v)
+local speedSlider = createSlider(mainContent, 136, "Orbit Speed", 1, 4500, orbitSpeed, 0, function(v)
     orbitSpeed = math.floor(v + 0.5)
 end)
 
-local distanceSlider = createSlider(main, 218, "Orbit Distance", 2, 700000, tpRadius, 0, function(v)
+local distanceSlider = createSlider(mainContent, 186, "Orbit Distance", 2, 700000, tpRadius, 0, function(v)
     tpRadius = v
 end)
 
-local intervalSlider = createSlider(main, 268, "Orbit TP Time", 0.0001, 1.5, tpInterval, 4, function(v)
+local intervalSlider = createSlider(mainContent, 236, "Orbit TP Time", 0.0001, 1.5, tpInterval, 4, function(v)
     tpInterval = v
 end)
 
 -- Target select UI (player list)
 local targetLabel = Instance.new("TextLabel")
-targetLabel.Parent = main
+targetLabel.Parent = mainContent
 targetLabel.Size = UDim2.new(1, -20, 0, 18)
-targetLabel.Position = UDim2.new(0, 10, 0, 322)
+targetLabel.Position = UDim2.new(0, 10, 0, 290)
 targetLabel.BackgroundTransparency = 1
 targetLabel.TextColor3 = Color3.fromRGB(220, 220, 235)
 targetLabel.Font = Enum.Font.Gotham
@@ -846,9 +866,9 @@ targetLabel.TextXAlignment = Enum.TextXAlignment.Left
 targetLabel.Text = "Target: None"
 
 local refreshTargetBtn = Instance.new("TextButton")
-refreshTargetBtn.Parent = main
+refreshTargetBtn.Parent = mainContent
 refreshTargetBtn.Size = UDim2.new(1, -20, 0, 24)
-refreshTargetBtn.Position = UDim2.new(0, 10, 0, 342)
+refreshTargetBtn.Position = UDim2.new(0, 10, 0, 310)
 refreshTargetBtn.BackgroundColor3 = Color3.fromRGB(45, 45, 60)
 refreshTargetBtn.BorderSizePixel = 0
 refreshTargetBtn.TextColor3 = Color3.fromRGB(230, 230, 245)
@@ -858,9 +878,9 @@ refreshTargetBtn.Text = "Refresh Player List"
 Instance.new("UICorner", refreshTargetBtn).CornerRadius = UDim.new(0, 6)
 
 local playerListFrame = Instance.new("ScrollingFrame")
-playerListFrame.Parent = main
+playerListFrame.Parent = mainContent
 playerListFrame.Size = UDim2.new(1, -20, 0, 88)
-playerListFrame.Position = UDim2.new(0, 10, 0, 370)
+playerListFrame.Position = UDim2.new(0, 10, 0, 338)
 playerListFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 48)
 playerListFrame.BorderSizePixel = 0
 playerListFrame.ScrollBarThickness = 4
@@ -877,9 +897,9 @@ listLayout.Padding = UDim.new(0, 4)
 
 -- Void UI
 local voidBtn = Instance.new("TextButton")
-voidBtn.Parent = main
+voidBtn.Parent = mainContent
 voidBtn.Size = UDim2.new(1, -20, 0, 30)
-voidBtn.Position = UDim2.new(0, 10, 0, 508)
+voidBtn.Position = UDim2.new(0, 10, 0, 476)
 voidBtn.BackgroundColor3 = Color3.fromRGB(42, 62, 96)
 voidBtn.BorderSizePixel = 0
 voidBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -1039,11 +1059,11 @@ RunService.RenderStepped:Connect(function()
     setDot(voidKeyStatusDot, KEYBIND_VOID_TOGGLE)
 end)
 
-local voidHideSlider = createSlider(main, 546, "Void Hide Time", 0.05, 10, voidHideTime, 2, function(v)
+local voidHideSlider = createSlider(mainContent, 514, "Void Hide Time", 0.05, 10, voidHideTime, 2, function(v)
     voidHideTime = v
 end)
 
-local voidAttackSlider = createSlider(main, 596, "Void Attack Time", 0.05, 10, voidAttackTime, 2, function(v)
+local voidAttackSlider = createSlider(mainContent, 564, "Void Attack Time", 0.05, 10, voidAttackTime, 2, function(v)
     voidAttackTime = v
 end)
 
@@ -1051,9 +1071,9 @@ end)
 
 -- ESP UI
 local espBtn = Instance.new("TextButton")
-espBtn.Parent = main
+espBtn.Parent = mainContent
 espBtn.Size = UDim2.new(1, -20, 0, 30)
-espBtn.Position = UDim2.new(0, 10, 0, 676)
+espBtn.Position = UDim2.new(0, 10, 0, 644)
 espBtn.BackgroundColor3 = Color3.fromRGB(42, 96, 72)
 espBtn.BorderSizePixel = 0
 espBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -1063,9 +1083,9 @@ espBtn.Text = "ESP: OFF"
 Instance.new("UICorner", espBtn).CornerRadius = UDim.new(0, 6)
 
 local saveCfgBtn = Instance.new("TextButton")
-saveCfgBtn.Parent = main
+saveCfgBtn.Parent = mainContent
 saveCfgBtn.Size = UDim2.new(1, -20, 0, 30)
-saveCfgBtn.Position = UDim2.new(0, 10, 0, 710)
+saveCfgBtn.Position = UDim2.new(0, 10, 0, 678)
 saveCfgBtn.BackgroundColor3 = Color3.fromRGB(82, 88, 130)
 saveCfgBtn.BorderSizePixel = 0
 saveCfgBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -1075,9 +1095,9 @@ saveCfgBtn.Text = "Save Config"
 Instance.new("UICorner", saveCfgBtn).CornerRadius = UDim.new(0, 6)
 
 local loadCfgBtn = Instance.new("TextButton")
-loadCfgBtn.Parent = main
+loadCfgBtn.Parent = mainContent
 loadCfgBtn.Size = UDim2.new(1, -20, 0, 30)
-loadCfgBtn.Position = UDim2.new(0, 10, 0, 744)
+loadCfgBtn.Position = UDim2.new(0, 10, 0, 712)
 loadCfgBtn.BackgroundColor3 = Color3.fromRGB(100, 84, 150)
 loadCfgBtn.BorderSizePixel = 0
 loadCfgBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -1085,6 +1105,21 @@ loadCfgBtn.Font = Enum.Font.GothamBold
 loadCfgBtn.TextSize = 12
 loadCfgBtn.Text = "Load Config"
 Instance.new("UICorner", loadCfgBtn).CornerRadius = UDim.new(0, 6)
+
+task.defer(function()
+	task.wait()
+	local pad = 28
+	local maxB = 0
+	for _, ch in ipairs(mainContent:GetChildren()) do
+		if ch:IsA("GuiObject") then
+			local bottom = ch.Position.Y.Offset + ch.Size.Y.Offset
+			if bottom > maxB then
+				maxB = bottom
+			end
+		end
+	end
+	mainContent.CanvasSize = UDim2.new(0, 0, 0, math.max(780, maxB + pad))
+end)
 
 -- Animation panel (side tab)
 -- (Animation UI removed per user request)
