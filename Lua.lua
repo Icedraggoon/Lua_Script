@@ -6,7 +6,20 @@ local Players = game:GetService("Players")
 local UIS = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
 local HttpService = game:GetService("HttpService")
-local GuiService = game:GetService("GuiService")
+local GuiService = nil
+pcall(function()
+    GuiService = game:GetService("GuiService")
+end)
+if not GuiService then
+    GuiService = {
+        GetFocusedTextBox = function(_self)
+            return nil
+        end,
+        GetGuiObjectsAtPosition = function(_self, _x, _y)
+            return {}
+        end,
+    }
+end
 
 local LP = Players.LocalPlayer
 
@@ -1730,7 +1743,13 @@ UIS.InputBegan:Connect(function(input, _gameProcessed)
     if input.UserInputType == Enum.UserInputType.MouseButton1 then
         pos = UIS:GetMouseLocation()
     end
-    local objs = GuiService:GetGuiObjectsAtPosition(pos.X, pos.Y)
+    local objs = {}
+    pcall(function()
+        objs = GuiService:GetGuiObjectsAtPosition(pos.X, pos.Y)
+    end)
+    if type(objs) ~= "table" then
+        objs = {}
+    end
 
     if authGate.Visible then
         local hitA = pickHitUnderRoot(authGate, objs, pos)
