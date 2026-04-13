@@ -1730,7 +1730,7 @@ UIS.InputBegan:Connect(function(input, _gameProcessed)
     if input.UserInputType == Enum.UserInputType.MouseButton1 then
         pos = UIS:GetMouseLocation()
     end
-    local objs = GuiService:GetGuiObjectsAtPosition(pos)
+    local objs = GuiService:GetGuiObjectsAtPosition(pos.X, pos.Y)
 
     if authGate.Visible then
         local hitA = pickHitUnderRoot(authGate, objs, pos)
