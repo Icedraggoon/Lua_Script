@@ -91,6 +91,8 @@ local inVoidDistanceStuds = 200000000
 local espEnabled = false
 local espConn = nil
 local espPool = {}
+-- 워터마크 거리 줄 (buildMainUI에서 할당)
+local topDistLabelRef = nil
 
 -- Executor workspace (Synapse/Krnl 등): Ice Lua/config 아래에 저장
 local SETTINGS_REL_DIR = "Ice Lua/config"
@@ -604,8 +606,8 @@ pcall(function() gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling end)
 local topInfo = Instance.new("Frame")
 topInfo.Name = "TopInfoUI"
 topInfo.Parent = gui
-topInfo.Size = UDim2.new(0, 600, 0, 34)
-topInfo.Position = UDim2.new(0.5, -300, 0, 4)
+topInfo.Size = UDim2.new(0, 700, 0, 52)
+topInfo.Position = UDim2.new(0.5, -350, 0, 4)
 topInfo.BackgroundColor3 = Color3.fromRGB(28, 28, 35)
 topInfo.BorderSizePixel = 1
 topInfo.BorderColor3 = Color3.fromRGB(80, 80, 100)
@@ -615,15 +617,29 @@ Instance.new("UICorner", topInfo).CornerRadius = UDim.new(0, 8)
 local topBanner = Instance.new("TextLabel")
 topBanner.Name = "TopBanner"
 topBanner.Parent = topInfo
-topBanner.Size = UDim2.new(1, -12, 1, 0)
-topBanner.Position = UDim2.new(0, 6, 0, 0)
+topBanner.Size = UDim2.new(1, -12, 0, 26)
+topBanner.Position = UDim2.new(0, 6, 0, 4)
 topBanner.BackgroundTransparency = 1
 topBanner.Text = "Ice Lua https://discord.gg/NDMCnpmCjG"
 topBanner.TextColor3 = Color3.fromRGB(235, 235, 245)
 topBanner.Font = Enum.Font.GothamBold
-topBanner.TextSize = 16
+topBanner.TextSize = 17
 topBanner.TextXAlignment = Enum.TextXAlignment.Center
 topBanner.ZIndex = 3001
+
+local topDistLabel = Instance.new("TextLabel")
+topDistLabel.Name = "TopDistance"
+topDistLabel.Parent = topInfo
+topDistLabel.Size = UDim2.new(1, -12, 0, 22)
+topDistLabel.Position = UDim2.new(0, 6, 0, 28)
+topDistLabel.BackgroundTransparency = 1
+topDistLabel.Text = "Distance: --"
+topDistLabel.TextColor3 = Color3.fromRGB(190, 200, 230)
+topDistLabel.Font = Enum.Font.Gotham
+topDistLabel.TextSize = 14
+topDistLabel.TextXAlignment = Enum.TextXAlignment.Center
+topDistLabel.ZIndex = 3001
+topDistLabelRef = topDistLabel
 
 -- Main draggable UI
 local main = Instance.new("Frame")
@@ -2610,6 +2626,37 @@ end
 function getSelectedTargetPlayer()
     if selectedTargetName == "" then return nil end
     return findTargetPlayer(selectedTargetName)
+end
+
+do
+    local wmAcc = 0
+    RunService.Heartbeat:Connect(function(dt)
+        wmAcc = wmAcc + dt
+        if wmAcc < 0.12 then
+            return
+        end
+        wmAcc = 0
+        local lab = topDistLabelRef
+        if not lab or not lab.Parent then
+            return
+        end
+        local myHRP = getMyHRP()
+        local target = getSelectedTargetPlayer()
+        if not target then
+            target = findClosestAliveTarget()
+        end
+        local ch = target and target.Character
+        local thrp = ch and ch:FindFirstChild("HumanoidRootPart")
+        local hum = ch and ch:FindFirstChildOfClass("Humanoid")
+        if myHRP and thrp and hum and hum.Health > 0 then
+            local d = (myHRP.Position - thrp.Position).Magnitude
+            lab.Text = string.format("Distance: %.0f studs → %s", d, target.Name)
+        elseif selectedTargetName ~= "" then
+            lab.Text = "Distance: -- (target off / respawn)"
+        else
+            lab.Text = "Distance: -- (no target)"
+        end
+    end)
 end
 
 local function fireLeftClick()
