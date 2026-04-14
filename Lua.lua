@@ -601,6 +601,19 @@ if not gui.Parent then
 end
 pcall(function() gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling end)
 
+local topBanner = Instance.new("TextLabel")
+topBanner.Name = "TopBanner"
+topBanner.Parent = gui
+topBanner.Size = UDim2.new(0, 460, 0, 22)
+topBanner.Position = UDim2.new(0.5, -230, 0, 2)
+topBanner.BackgroundTransparency = 1
+topBanner.Text = "Ice Lua https://discord.gg/NDMCnpmCjG"
+topBanner.TextColor3 = Color3.fromRGB(235, 235, 245)
+topBanner.Font = Enum.Font.GothamBold
+topBanner.TextSize = 13
+topBanner.TextXAlignment = Enum.TextXAlignment.Center
+topBanner.ZIndex = 3000
+
 -- Main draggable UI
 local main = Instance.new("Frame")
 main.Name = "MainUI"
