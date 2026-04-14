@@ -606,7 +606,7 @@ local main = Instance.new("Frame")
 main.Name = "MainUI"
 main.Parent = gui
 main.Size = UDim2.new(0, 340, 0, 834)
-main.Position = UDim2.new(0.5, -140, 0.5, -120)
+main.Position = UDim2.new(0.5, -170, 0, 48) -- top-center fixed
 main.BackgroundColor3 = Color3.fromRGB(28, 28, 35)
 main.BorderSizePixel = 1
 main.BorderColor3 = Color3.fromRGB(80, 80, 100)
@@ -635,7 +635,7 @@ title.Parent = topBar
 title.Size = UDim2.new(1, -10, 1, 0)
 title.Position = UDim2.new(0, 10, 0, 0)
 title.BackgroundTransparency = 1
-title.Text = "Draggable UI"
+title.Text = "Ice Lua https://discord.gg/NDMCnpmCjG"
 title.TextXAlignment = Enum.TextXAlignment.Left
 title.TextColor3 = Color3.fromRGB(235, 235, 245)
 title.Font = Enum.Font.GothamBold
@@ -1500,7 +1500,7 @@ local toggleBtn = Instance.new("TextButton")
 toggleBtn.Name = "ToggleButton"
 toggleBtn.Parent = gui
 toggleBtn.Size = UDim2.new(0, 160, 0, 34)
-toggleBtn.Position = UDim2.new(0.5, -80, 0.5, 70)
+toggleBtn.Position = UDim2.new(0.5, -80, 0, 8)
 toggleBtn.BackgroundColor3 = Color3.fromRGB(96, 72, 190)
 toggleBtn.BorderSizePixel = 0
 toggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -1518,7 +1518,7 @@ local authGate = Instance.new("Frame")
 authGate.Name = "AuthGate"
 authGate.Parent = gui
 authGate.Size = UDim2.new(0, 360, 0, 170)
-authGate.Position = UDim2.new(0.5, -180, 0.5, -85)
+authGate.Position = UDim2.new(0.5, -180, 0, 56)
 authGate.BackgroundColor3 = Color3.fromRGB(28, 28, 35)
 authGate.BorderSizePixel = 1
 authGate.BorderColor3 = Color3.fromRGB(80, 80, 100)
@@ -1670,6 +1670,7 @@ UIS.InputEnded:Connect(function(input)
 end)
 
 -- Drag logic: main 전체에서 잡기 (슬라이더/버튼/입력/스크롤 제외)
+local UI_DRAG_ENABLED = false -- fixed layout: no dragging
 local dragging = false
 local dragUsesScreenMouse = false
 local dragStart = Vector2.new()
@@ -1731,6 +1732,9 @@ UIS.InputBegan:Connect(function(input, _gameProcessed)
     -- UI 위 클릭은 gameProcessed가 true로 오는 경우가 많아서 여기서는 막지 않음
     if input.UserInputType ~= Enum.UserInputType.MouseButton1
         and input.UserInputType ~= Enum.UserInputType.Touch then
+        return
+    end
+    if not UI_DRAG_ENABLED then
         return
     end
     local typing = false
