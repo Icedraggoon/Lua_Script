@@ -601,18 +601,29 @@ if not gui.Parent then
 end
 pcall(function() gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling end)
 
+local topInfo = Instance.new("Frame")
+topInfo.Name = "TopInfoUI"
+topInfo.Parent = gui
+topInfo.Size = UDim2.new(0, 600, 0, 34)
+topInfo.Position = UDim2.new(0.5, -300, 0, 4)
+topInfo.BackgroundColor3 = Color3.fromRGB(28, 28, 35)
+topInfo.BorderSizePixel = 1
+topInfo.BorderColor3 = Color3.fromRGB(80, 80, 100)
+topInfo.ZIndex = 3000
+Instance.new("UICorner", topInfo).CornerRadius = UDim.new(0, 8)
+
 local topBanner = Instance.new("TextLabel")
 topBanner.Name = "TopBanner"
-topBanner.Parent = gui
-topBanner.Size = UDim2.new(0, 560, 0, 30)
-topBanner.Position = UDim2.new(0.5, -280, 0.5, -154)
+topBanner.Parent = topInfo
+topBanner.Size = UDim2.new(1, -12, 1, 0)
+topBanner.Position = UDim2.new(0, 6, 0, 0)
 topBanner.BackgroundTransparency = 1
 topBanner.Text = "Ice Lua https://discord.gg/NDMCnpmCjG"
 topBanner.TextColor3 = Color3.fromRGB(235, 235, 245)
 topBanner.Font = Enum.Font.GothamBold
 topBanner.TextSize = 16
 topBanner.TextXAlignment = Enum.TextXAlignment.Center
-topBanner.ZIndex = 3000
+topBanner.ZIndex = 3001
 
 -- Main draggable UI
 local main = Instance.new("Frame")
@@ -625,16 +636,6 @@ main.BorderSizePixel = 1
 main.BorderColor3 = Color3.fromRGB(80, 80, 100)
 main.Active = true
 main.ClipsDescendants = false
-
-local function syncTopBannerToMain()
-    topBanner.Position = UDim2.new(
-        main.Position.X.Scale,
-        main.Position.X.Offset - 110,
-        main.Position.Y.Scale,
-        main.Position.Y.Offset - 34
-    )
-end
-syncTopBannerToMain()
 
 -- (removed UI scale)
 
@@ -1816,7 +1817,6 @@ UIS.InputChanged:Connect(function(input)
         startPos.Y.Scale,
         startPos.Y.Offset + delta.Y
     )
-    syncTopBannerToMain()
 end)
 
 UIS.InputEnded:Connect(function(input)
