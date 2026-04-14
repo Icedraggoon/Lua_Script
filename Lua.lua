@@ -603,28 +603,29 @@ pcall(function() gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling end)
 
 local topBanner = Instance.new("TextLabel")
 topBanner.Name = "TopBanner"
-topBanner.Parent = gui
-topBanner.Size = UDim2.new(0, 460, 0, 22)
-topBanner.Position = UDim2.new(0.5, -230, 0, 2)
+topBanner.Parent = nil
+topBanner.Size = UDim2.new(0, 560, 0, 30)
+topBanner.Position = UDim2.new(0.5, -280, 0, -34)
 topBanner.BackgroundTransparency = 1
 topBanner.Text = "Ice Lua https://discord.gg/NDMCnpmCjG"
 topBanner.TextColor3 = Color3.fromRGB(235, 235, 245)
 topBanner.Font = Enum.Font.GothamBold
-topBanner.TextSize = 13
+topBanner.TextSize = 16
 topBanner.TextXAlignment = Enum.TextXAlignment.Center
-topBanner.ZIndex = 3000
+topBanner.ZIndex = 80
 
 -- Main draggable UI
 local main = Instance.new("Frame")
 main.Name = "MainUI"
 main.Parent = gui
 main.Size = UDim2.new(0, 340, 0, 834)
-main.Position = UDim2.new(0.5, -170, 0, 48) -- top-center fixed
+main.Position = UDim2.new(0.5, -140, 0.5, -120)
 main.BackgroundColor3 = Color3.fromRGB(28, 28, 35)
 main.BorderSizePixel = 1
 main.BorderColor3 = Color3.fromRGB(80, 80, 100)
 main.Active = true
 main.ClipsDescendants = false
+topBanner.Parent = main
 
 -- (removed UI scale)
 
@@ -1513,7 +1514,7 @@ local toggleBtn = Instance.new("TextButton")
 toggleBtn.Name = "ToggleButton"
 toggleBtn.Parent = gui
 toggleBtn.Size = UDim2.new(0, 160, 0, 34)
-toggleBtn.Position = UDim2.new(0.5, -80, 0, 8)
+toggleBtn.Position = UDim2.new(0.5, -80, 0.5, 70)
 toggleBtn.BackgroundColor3 = Color3.fromRGB(96, 72, 190)
 toggleBtn.BorderSizePixel = 0
 toggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -1531,7 +1532,7 @@ local authGate = Instance.new("Frame")
 authGate.Name = "AuthGate"
 authGate.Parent = gui
 authGate.Size = UDim2.new(0, 360, 0, 170)
-authGate.Position = UDim2.new(0.5, -180, 0, 56)
+authGate.Position = UDim2.new(0.5, -180, 0.5, -85)
 authGate.BackgroundColor3 = Color3.fromRGB(28, 28, 35)
 authGate.BorderSizePixel = 1
 authGate.BorderColor3 = Color3.fromRGB(80, 80, 100)
@@ -1683,7 +1684,7 @@ UIS.InputEnded:Connect(function(input)
 end)
 
 -- Drag logic: main 전체에서 잡기 (슬라이더/버튼/입력/스크롤 제외)
-local UI_DRAG_ENABLED = false -- fixed layout: no dragging
+local UI_DRAG_ENABLED = true -- movable UI
 local dragging = false
 local dragUsesScreenMouse = false
 local dragStart = Vector2.new()
