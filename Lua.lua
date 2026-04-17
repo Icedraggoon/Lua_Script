@@ -183,13 +183,18 @@ local aaBindKey = "AA_Run_" .. tostring(LP.UserId)
 local aaAutoRotConn = nil
 local aaJoints = { neck = nil, waist = nil }
 local aaBase = { neckC0 = nil, waistC0 = nil }
-local aaSpecialMode = "Off" -- Off | Forward | Backward | Chaos
+local aaSpecialMode = "Off" -- Off | Forward | Backward | Chaos | Tornado
 local aaIgnoreAC = false
 local aaHardMode = false
 local aaSteppedConn = nil
 local aaLastRot = CFrame.new()
 local aaAnimateScript = nil
 local aaAnimateWasEnabled = nil
+local AA_TORNADO_ANIM_ID = "rbxassetid://82995540773684"
+local RIVALS_PLACE_ID = 17625359962
+local aaTornadoAnim = nil
+local aaTornadoTrack = nil
+local aaTornadoRemoteLast = 0
 
 -- Drone removed
 local droneEnabled = false
@@ -283,7 +288,76 @@ local aaHeadState = {
     saved = {}, -- {instance -> number(LocalTransparencyModifier)}
 }
 
+local function stopTornadoAnimTrack()
+    if aaTornadoTrack then
+        pcall(function()
+            aaTornadoTrack:Stop(0.08)
+            aaTornadoTrack:Destroy()
+        end)
+        aaTornadoTrack = nil
+    end
+end
+
+local function ensureTornadoAnimTrack(hum)
+    if not hum then return end
+    if aaTornadoTrack and aaTornadoTrack.IsPlaying then
+        return
+    end
+    local animator = hum:FindFirstChildOfClass("Animator")
+    if not animator then
+        pcall(function()
+            animator = Instance.new("Animator")
+            animator.Parent = hum
+        end)
+    end
+    if not animator then return end
+    if not aaTornadoAnim then
+        aaTornadoAnim = Instance.new("Animation")
+        aaTornadoAnim.AnimationId = AA_TORNADO_ANIM_ID
+    end
+    local ok, track = pcall(function()
+        return animator:LoadAnimation(aaTornadoAnim)
+    end)
+    if not ok or not track then
+        return
+    end
+    aaTornadoTrack = track
+    pcall(function()
+        aaTornadoTrack.Priority = Enum.AnimationPriority.Action4
+        aaTornadoTrack.Looped = true
+        aaTornadoTrack:Play(0.08, 1, 1.0)
+    end)
+end
+
+local function tryReplicateTornadoForRivals()
+    if game.PlaceId ~= RIVALS_PLACE_ID then
+        return
+    end
+    local now = tick()
+    if now - aaTornadoRemoteLast < 2.0 then
+        return
+    end
+    aaTornadoRemoteLast = now
+    pcall(function()
+        local rs = game:GetService("ReplicatedStorage")
+        local remotes = rs:FindFirstChild("Remotes")
+        local replication = remotes and remotes:FindFirstChild("Replication")
+        local fighter = replication and replication:FindFirstChild("Fighter")
+        local useEmote = fighter and fighter:FindFirstChild("UseEmoteByName")
+        if not useEmote then
+            return
+        end
+        -- 게임별 서버 검증을 통과하는 이름이 있을 때만 전체 복제됨
+        for _, name in ipairs({ "IlluminaStorm", "Tornado", AA_TORNADO_ANIM_ID }) do
+            pcall(function()
+                useEmote:FireServer(name)
+            end)
+        end
+    end)
+end
+
 local function stopAntiAim()
+    stopTornadoAnimTrack()
     if aaConn then aaConn:Disconnect(); aaConn = nil end
     pcall(function() RunService:UnbindFromRenderStep(aaBindKey) end)
     if aaAutoRotConn then aaAutoRotConn:Disconnect(); aaAutoRotConn = nil end
@@ -1158,7 +1232,7 @@ Instance.new("UICorner", loadCfgBtn).CornerRadius = UDim.new(0, 6)
 -- Anti-Aim panel (side tab)
 local aaPanel = Instance.new("Frame")
 aaPanel.Parent = main
-aaPanel.Size = UDim2.new(0, 300, 0, 300)
+aaPanel.Size = UDim2.new(0, 300, 0, 336)
 aaPanel.Position = UDim2.new(1, 10, 0, 60)
 aaPanel.BackgroundColor3 = Color3.fromRGB(24, 24, 32)
 aaPanel.BorderSizePixel = 1
@@ -1236,10 +1310,22 @@ aaSpecialBtn.TextSize = 11
 aaSpecialBtn.Text = "Special: Off"
 Instance.new("UICorner", aaSpecialBtn).CornerRadius = UDim.new(0, 6)
 
+local aaTornadoBtn = Instance.new("TextButton")
+aaTornadoBtn.Parent = aaPanel
+aaTornadoBtn.Size = UDim2.new(1, -16, 0, 24)
+aaTornadoBtn.Position = UDim2.new(0, 8, 0, 230)
+aaTornadoBtn.BackgroundColor3 = Color3.fromRGB(52, 52, 70)
+aaTornadoBtn.BorderSizePixel = 0
+aaTornadoBtn.TextColor3 = Color3.fromRGB(235, 235, 245)
+aaTornadoBtn.Font = Enum.Font.Gotham
+aaTornadoBtn.TextSize = 11
+aaTornadoBtn.Text = "Tornado Mode: OFF"
+Instance.new("UICorner", aaTornadoBtn).CornerRadius = UDim.new(0, 6)
+
 local aaHardModeBtn = Instance.new("TextButton")
 aaHardModeBtn.Parent = aaPanel
 aaHardModeBtn.Size = UDim2.new(1, -16, 0, 24)
-aaHardModeBtn.Position = UDim2.new(0, 8, 0, 230)
+aaHardModeBtn.Position = UDim2.new(0, 8, 0, 260)
 aaHardModeBtn.BackgroundColor3 = Color3.fromRGB(84, 48, 48)
 aaHardModeBtn.BorderSizePixel = 0
 aaHardModeBtn.TextColor3 = Color3.fromRGB(255, 225, 225)
@@ -1251,7 +1337,7 @@ Instance.new("UICorner", aaHardModeBtn).CornerRadius = UDim.new(0, 6)
 local aaIgnoreACBtn = Instance.new("TextButton")
 aaIgnoreACBtn.Parent = aaPanel
 aaIgnoreACBtn.Size = UDim2.new(1, -16, 0, 24)
-aaIgnoreACBtn.Position = UDim2.new(0, 8, 0, 260)
+aaIgnoreACBtn.Position = UDim2.new(0, 8, 0, 290)
 aaIgnoreACBtn.BackgroundColor3 = Color3.fromRGB(52, 52, 70)
 aaIgnoreACBtn.BorderSizePixel = 0
 aaIgnoreACBtn.TextColor3 = Color3.fromRGB(235, 235, 245)
@@ -1871,6 +1957,7 @@ end)
     U.aaSpinBtn = aaSpinBtn
     U.aaRollBtn = aaRollBtn
     U.aaPitchBtn = aaPitchBtn
+    U.aaTornadoBtn = aaTornadoBtn
     U.aaIgnoreACBtn = aaIgnoreACBtn
     U.aaHardModeBtn = aaHardModeBtn
     U.voidHideSlider = voidHideSlider
@@ -2065,6 +2152,11 @@ local function startAntiAim()
         stopAntiAim()
         return
     end
+    if aaSpecialMode == "Tornado" then
+        ensureTornadoAnimTrack(getMyHumanoid())
+    else
+        stopTornadoAnimTrack()
+    end
     -- Force AutoRotate=false when toggled back by game/tools
     local hum = getMyHumanoid()
     if hum then
@@ -2119,11 +2211,21 @@ local t = time()
                 local ok, tracks = pcall(function() return animator:GetPlayingAnimationTracks() end)
                 if ok and tracks then
                     for _, tr in ipairs(tracks) do
+                        local keepTornado = false
+                        if aaSpecialMode == "Tornado" then
+                            local anim = tr.Animation
+                            local aid = anim and tostring(anim.AnimationId) or ""
+                            if tr == aaTornadoTrack or aid == AA_TORNADO_ANIM_ID then
+                                keepTornado = true
+                            end
+                        end
+                        if not keepTornado then
                         pcall(function()
                             tr:AdjustWeight(0, 0)
                             tr:AdjustSpeed(aaHardMode and 0 or 1)
                             tr:Stop(0)
                         end)
+                        end
                     end
                 end
                 if aaHardMode then
@@ -2275,7 +2377,16 @@ local t = time()
             local to = baseC0 * targetLocal
             pcall(function() joint.C0 = from:Lerp(to, alpha) end)
         end
-        if aaSpecialMode == "Forward" then
+        if aaSpecialMode == "Tornado" then
+            local a = math.clamp(dt * 10, 0, 1)
+            spinAngle = spinAngle + dt * math.max(aaSpinSpeed, 18) * 2.8
+            local swirl = math.sin(t * 16) * 0.25
+            rot = rot * CFrame.Angles(0.35 + swirl, spinAngle, math.sin(t * 10) * 0.18)
+            lerpJointC0(aaJoints.waist, aaBase.waistC0, CFrame.Angles(0.85, 0, 0), a)
+            lerpJointC0(aaJoints.neck, aaBase.neckC0, CFrame.Angles(1.20, 0, 0), a)
+            ensureTornadoAnimTrack(hum)
+            tryReplicateTornadoForRivals()
+        elseif aaSpecialMode == "Forward" then
             local a = math.clamp(dt * 8, 0, 1)
             lerpJointC0(aaJoints.waist, aaBase.waistC0, CFrame.Angles(1.55, 0, 0), a) -- 더 깊게
             lerpJointC0(aaJoints.neck,  aaBase.neckC0,  CFrame.Angles(1.70, 0, 0), a) -- 머리 더 전방
@@ -2304,6 +2415,7 @@ local t = time()
             local a = math.clamp(dt * 10, 0, 1)
             lerpJointC0(aaJoints.waist, aaBase.waistC0, CFrame.new(), a)
             lerpJointC0(aaJoints.neck,  aaBase.neckC0,  CFrame.new(), a)
+            stopTornadoAnimTrack()
         end
 
         pcall(function()
@@ -2959,6 +3071,9 @@ local function applyConfig(cfg)
             if U.aaSpecialBtn and U.aaSpecialBtn.Parent then
                 U.aaSpecialBtn.Text = "Special: " .. aaSpecialMode
             end
+            if U.aaTornadoBtn and U.aaTornadoBtn.Parent then
+                U.aaTornadoBtn.Text = (aaSpecialMode == "Tornado") and "Tornado Mode: ON" or "Tornado Mode: OFF"
+            end
         end
 		if type(st.tp2Enabled) == "boolean" then
 			if st.tp2Enabled then U.startTP() else U.stopTP() end
@@ -3144,14 +3259,32 @@ U.aaIgnoreACBtn.MouseButton1Click:Connect(function()
 end)
 
 U.aaSpecialBtn.MouseButton1Click:Connect(function()
-    local order = {"Off","Forward","Backward","Chaos"}
+    local order = {"Off","Forward","Backward","Chaos","Tornado"}
     local idx = 1
     for i,v in ipairs(order) do if v==aaSpecialMode then idx=i break end end
     idx = (idx % #order) + 1
     aaSpecialMode = order[idx]
     U.aaSpecialBtn.Text = "Special: " .. aaSpecialMode
+    if U.aaTornadoBtn and U.aaTornadoBtn.Parent then
+        U.aaTornadoBtn.Text = (aaSpecialMode == "Tornado") and "Tornado Mode: ON" or "Tornado Mode: OFF"
+    end
     if aaPitchMode ~= "Off" or aaSpinOn or aaRollOn or aaSpecialMode ~= "Off" then
         startAntiAim()
+    end
+end)
+
+U.aaTornadoBtn.MouseButton1Click:Connect(function()
+    if aaSpecialMode == "Tornado" then
+        aaSpecialMode = "Off"
+    else
+        aaSpecialMode = "Tornado"
+    end
+    U.aaSpecialBtn.Text = "Special: " .. aaSpecialMode
+    U.aaTornadoBtn.Text = (aaSpecialMode == "Tornado") and "Tornado Mode: ON" or "Tornado Mode: OFF"
+    if aaPitchMode ~= "Off" or aaSpinOn or aaRollOn or aaSpecialMode ~= "Off" then
+        startAntiAim()
+    else
+        stopAntiAim()
     end
 end)
 
