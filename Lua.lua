@@ -303,21 +303,27 @@ local function ensureTornadoAnimTrack(hum)
     if aaTornadoTrack and aaTornadoTrack.IsPlaying then
         return
     end
-    local animator = hum:FindFirstChildOfClass("Animator")
-    if not animator then
-        pcall(function()
-            animator = Instance.new("Animator")
-            animator.Parent = hum
-        end)
-    end
-    if not animator then return end
     if not aaTornadoAnim then
         aaTornadoAnim = Instance.new("Animation")
         aaTornadoAnim.AnimationId = AA_TORNADO_ANIM_ID
     end
     local ok, track = pcall(function()
-        return animator:LoadAnimation(aaTornadoAnim)
+        return hum:LoadAnimation(aaTornadoAnim)
     end)
+    if (not ok or not track) then
+        local animator = hum:FindFirstChildOfClass("Animator")
+        if not animator then
+            pcall(function()
+                animator = Instance.new("Animator")
+                animator.Parent = hum
+            end)
+        end
+        if animator then
+            ok, track = pcall(function()
+                return animator:LoadAnimation(aaTornadoAnim)
+            end)
+        end
+    end
     if not ok or not track then
         return
     end
@@ -325,7 +331,7 @@ local function ensureTornadoAnimTrack(hum)
     pcall(function()
         aaTornadoTrack.Priority = Enum.AnimationPriority.Action4
         aaTornadoTrack.Looped = true
-        aaTornadoTrack:Play(0.08, 1, 1.0)
+        aaTornadoTrack:Play(0.05, 1, 1.12)
     end)
 end
 
@@ -2170,7 +2176,8 @@ local function startAntiAim()
             end
         end)
     end
-    -- Try disabling default Animate script while Anti-Aim is active to prevent tool/run tracks from fighting
+    -- Try disabling default Animate script while Anti-Aim is active to prevent tool/run tracks from fighting.
+    -- Tornado mode needs animation replication, so keep Animate enabled there.
     do
         local ch = LP.Character
         if ch then
@@ -2183,10 +2190,13 @@ local function startAntiAim()
                     end
                 end
             end
-            if anim and anim:IsA("LocalScript") then
+            if anim and anim:IsA("LocalScript") and aaSpecialMode ~= "Tornado" then
                 aaAnimateScript = anim
                 aaAnimateWasEnabled = not anim.Disabled
                 pcall(function() anim.Disabled = true end)
+            elseif anim and anim:IsA("LocalScript") and aaSpecialMode == "Tornado" then
+                -- Tornado: explicitly ensure Animate is on
+                pcall(function() anim.Disabled = false end)
             end
         end
     end
