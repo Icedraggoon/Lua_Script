@@ -587,7 +587,8 @@ end
 -- Key system (server verify: key + hwid; IP는 서버가 요청에서 읽어 묶음)
 local KEYSYS_API_URL = "https://lua-key-server-production.up.railway.app/verify"
 local KEYSYS_CACHE_FILE = SETTINGS_REL_DIR .. "/Simple_Draggable_Toggle_UI_KeyCache.json"
-local KEYSYS_ALLOWED_TIERS = { regular = true }
+-- regular 빌드: regular 키 + 상위(private/premium) 키도 동일 스크립트에서 사용 가능
+local KEYSYS_ALLOWED_TIERS = { regular = true, private = true, premium = true }
 local keyAuthPassed = false
 
 local function getBestHWID()
@@ -731,7 +732,7 @@ local function verifyKeyWithServer(keyText)
                     tier = string.lower(parsed.tier)
                 end
                 if not KEYSYS_ALLOWED_TIERS[tier] then
-                    return false, "이 키는 regular 전용이 아닙니다. (" .. tostring(tier) .. ")"
+                    return false, "이 regular 버전에서 사용할 수 없는 키 등급입니다. (" .. tostring(tier) .. ")"
                 end
                 return true, tostring(parsed.message or "인증 성공")
             end

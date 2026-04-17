@@ -80,6 +80,7 @@ local voidHideTime = 0.65
 local voidAttackTime = 0.35
 local voidDistanceStuds = 200000000
 local voidAnchorPos = nil
+local voidReturnCFrame = nil
 
 -- InVoid removed
 local inVoidEnabled = false
@@ -2090,15 +2091,15 @@ local function getOrbitOffset(patternName, angle, radius)
         return Vector3.new(math.cos(a) * rr, (math.random() - 0.5) * 1.5, math.sin(a) * rr)
     elseif patternName == "Random spot" then
         local dx = math.random() - 0.5
-        local dy = math.random() - 0.5
         local dz = math.random() - 0.5
-        local dir = Vector3.new(dx, dy, dz)
+        -- keep huge distance, but avoid massive Y teleports that cause freeze/disappear behavior
+        local dir = Vector3.new(dx, 0, dz)
         if dir.Magnitude < 1e-4 then
             dir = Vector3.new(1, 0, 0)
         else
             dir = dir.Unit
         end
-        return dir * r
+        return Vector3.new(dir.X * r, (math.random() - 0.5) * 8, dir.Z * r)
     elseif patternName == "Star" then
         local rr = r * (0.55 + 0.45 * math.cos(5 * angle))
         return Vector3.new(math.cos(angle) * rr, 0, math.sin(angle) * rr)
@@ -2657,8 +2658,8 @@ local function startOrbit()
         local patternName = orbitPatterns[orbitPatternIndex]
 
         -- Private: 패턴 중심 동작
-        -- Random spot은 고정 초고속 간격으로 처리하고, speed/tp time 영향 제거
-        local stepInterval = (patternName == "Random spot") and 0.0001 or 0.012
+        -- Random spot 거리(100k~700k)는 유지하고, 틱만 안정화해서 제자리 고정 현상 완화
+        local stepInterval = (patternName == "Random spot") and 0.008 or 0.012
 
         tpAccumulator = tpAccumulator + dt
         if tpAccumulator < stepInterval then
@@ -2973,12 +2974,66 @@ local function stopVoid()
     voidThread = nil
     U.voidBtn.Text = voidBtnLabel(false)
     U.voidBtn.BackgroundColor3 = Color3.fromRGB(42, 62, 96)
+    local myHRP = getMyHRP()
+    if myHRP and voidReturnCFrame then
+        pcall(function()
+            myHRP.CFrame = voidReturnCFrame
+            myHRP.AssemblyLinearVelocity = Vector3.zero
+        end)
+    end
+    voidReturnCFrame = nil
+    voidAnchorPos = nil
     pcall(function()
         UIS.MouseBehavior = Enum.MouseBehavior.Default
     end)
 end
 
 -- In Void logic removed
+
+local function buildVoidAnchorPos(origin)
+    local useX = (math.random() < 0.5)
+    local sx = (math.random() < 0.5) and -1 or 1
+    local sz = (math.random() < 0.5) and -1 or 1
+    local ox = useX and (voidDistanceStuds * sx) or 0
+    local oz = useX and 0 or (voidDistanceStuds * sz)
+    return Vector3.new(
+        origin.X + ox,
+        math.max(origin.Y + 1500, 1500),
+        origin.Z + oz
+    )
+end
+
+local function forceVoidPosition(hrp)
+    if not hrp then return false end
+    local before = hrp.Position
+    local targetPos = voidAnchorPos or buildVoidAnchorPos(before)
+    voidAnchorPos = targetPos
+
+    local ok = pcall(function()
+        hrp.CFrame = CFrame.new(targetPos)
+        hrp.AssemblyLinearVelocity = Vector3.zero
+    end)
+    if not ok then
+        return false
+    end
+
+    -- 엔진/게임이 초장거리 이동을 무시한 경우 앵커를 재생성해서 다시 시도
+    if (hrp.Position - before).Magnitude < 1 then
+        for _ = 1, 2 do
+            targetPos = buildVoidAnchorPos(before)
+            voidAnchorPos = targetPos
+            local retryOk = pcall(function()
+                hrp.CFrame = CFrame.new(targetPos)
+                hrp.AssemblyLinearVelocity = Vector3.zero
+            end)
+            if retryOk and (hrp.Position - before).Magnitude >= 1 then
+                return true
+            end
+        end
+        return false
+    end
+    return true
+end
 
 local function startVoid()
     voidEnabled = true
@@ -2990,12 +3045,8 @@ local function startVoid()
     task.spawn(function()
         local baseHRP = getMyHRP()
         if baseHRP then
-            -- 너무 낮거나 지형 아래로 빠져 죽지 않도록 안전한 높이로 고정
-            voidAnchorPos = Vector3.new(
-                baseHRP.Position.X + voidDistanceStuds,
-                math.max(baseHRP.Position.Y + 1500, 1500),
-                baseHRP.Position.Z + voidDistanceStuds
-            )
+            voidReturnCFrame = baseHRP.CFrame
+            voidAnchorPos = buildVoidAnchorPos(baseHRP.Position)
         end
 
         while voidEnabled and voidThread == thisThread do
@@ -3011,22 +3062,14 @@ local function startVoid()
             end
 
             if not voidAnchorPos then
-                voidAnchorPos = Vector3.new(
-                    myHRP.Position.X + voidDistanceStuds,
-                    math.max(myHRP.Position.Y + 1500, 1500),
-                    myHRP.Position.Z + voidDistanceStuds
-                )
+                voidAnchorPos = buildVoidAnchorPos(myHRP.Position)
             end
 
-            local voidPos = voidAnchorPos
             local hideUntil = tick() + voidHideTime
             while voidEnabled and voidThread == thisThread and tick() < hideUntil do
                 local hrp = getMyHRP()
                 if hrp then
-                    pcall(function()
-                        hrp.CFrame = CFrame.new(voidPos)
-                        hrp.AssemblyLinearVelocity = Vector3.zero
-                    end)
+                    forceVoidPosition(hrp)
                 end
                 task.wait(0.005)
             end
@@ -3036,10 +3079,7 @@ local function startVoid()
                 -- 공격 직전에도 void 기준점에서 출발하도록 강제
                 local hrp = getMyHRP()
                 if hrp then
-                    pcall(function()
-                        hrp.CFrame = CFrame.new(voidPos)
-                        hrp.AssemblyLinearVelocity = Vector3.zero
-                    end)
+                    forceVoidPosition(hrp)
                 end
                 local attacked = attackSelectedOnce() -- 타겟으로 갔다가 바로 voidPos로 복귀
                 if not attacked then
