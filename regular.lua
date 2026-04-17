@@ -23,11 +23,10 @@ end
 
 local LP = Players.LocalPlayer
 
--- Orbit / Void keyboard toggles (nil = unbound; change via UI "키" buttons)
+-- Orbit keyboard toggle (Regular: Z만 사용; UI 키 설정은 숨김)
 local KEYBIND_ORBIT_TOGGLE = Enum.KeyCode.Z
-local KEYBIND_VOID_TOGGLE = nil
-local keybindCaptureMode = nil -- "orbit" | "void" while waiting for a key
-local keybindHotkeysEnabled = true -- master switch for Orbit/Void hotkeys
+local keybindCaptureMode = nil -- "orbit" while waiting for a key
+local keybindHotkeysEnabled = true -- master switch for Orbit hotkey
 local KEY_STATUS_DOWN = Color3.fromRGB(40, 175, 85)
 local KEY_STATUS_UP = Color3.fromRGB(185, 50, 55)
 local KEY_STATUS_NONE = Color3.fromRGB(70, 70, 82)
@@ -52,14 +51,6 @@ local function orbitBtnLabel(on)
     return "Orbit: " .. s
 end
 
-local function voidBtnLabel(on)
-    local s = on and "ON" or "OFF"
-    if KEYBIND_VOID_TOGGLE then
-        return "Void: " .. s .. " [" .. KEYBIND_VOID_TOGGLE.Name .. "]"
-    end
-    return "Void: " .. s
-end
-
 -- Orbit/Rage state
 local orbitEnabled = false
 local orbitConn = nil
@@ -77,20 +68,6 @@ local REGULAR_MODE = true
 local REGULAR_ORBIT_SPEED = 4500
 local REGULAR_TP_RADIUS = 700000
 local REGULAR_TP_INTERVAL = 0.0001
-
-local voidEnabled = false
-local voidThread = nil
-local voidHideTime = 0.65
-local voidAttackTime = 0.35
-local voidDistanceStuds = 200000000
-local voidAnchorPos = nil
-
--- InVoid removed
-local inVoidEnabled = false
-local inVoidThread = nil
--- NOTE: extremely large coordinates (e.g. 1e9) often get clamped / desynced / rejected.
--- keep this at a safer scale similar to Void.
-local inVoidDistanceStuds = 200000000
 
 local espEnabled = false
 local espConn = nil
@@ -772,7 +749,7 @@ pcall(function() gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling end)
 local topInfo = Instance.new("Frame")
 topInfo.Name = "TopInfoUI"
 topInfo.Parent = gui
-topInfo.Size = UDim2.new(0, 700, 0, 52)
+topInfo.Size = UDim2.new(0, 700, 0, 68)
 topInfo.Position = UDim2.new(0.5, -350, 0, 4)
 topInfo.BackgroundColor3 = Color3.fromRGB(28, 28, 35)
 topInfo.BorderSizePixel = 1
@@ -783,7 +760,7 @@ Instance.new("UICorner", topInfo).CornerRadius = UDim.new(0, 8)
 local topBanner = Instance.new("TextLabel")
 topBanner.Name = "TopBanner"
 topBanner.Parent = topInfo
-topBanner.Size = UDim2.new(1, -12, 0, 26)
+topBanner.Size = UDim2.new(1, -12, 0, 40)
 topBanner.Position = UDim2.new(0, 6, 0, 4)
 topBanner.BackgroundTransparency = 1
 topBanner.Text = "Ice Lua REGULAR https://discord.gg/NDMCnpmCjG"
@@ -791,13 +768,14 @@ topBanner.TextColor3 = Color3.fromRGB(235, 235, 245)
 topBanner.Font = Enum.Font.GothamBold
 topBanner.TextSize = 17
 topBanner.TextXAlignment = Enum.TextXAlignment.Center
+topBanner.TextWrapped = true
 topBanner.ZIndex = 3001
 
 local topDistLabel = Instance.new("TextLabel")
 topDistLabel.Name = "TopDistance"
 topDistLabel.Parent = topInfo
 topDistLabel.Size = UDim2.new(1, -12, 0, 22)
-topDistLabel.Position = UDim2.new(0, 6, 0, 28)
+topDistLabel.Position = UDim2.new(0, 6, 0, 44)
 topDistLabel.BackgroundTransparency = 1
 topDistLabel.Text = "Distance: --"
 topDistLabel.TextColor3 = Color3.fromRGB(190, 200, 230)
@@ -1108,25 +1086,12 @@ listLayout.Padding = UDim.new(0, 4)
 
 -- Rage UI removed
 
--- Void UI
-local voidBtn = Instance.new("TextButton")
-voidBtn.Parent = main
-voidBtn.Size = UDim2.new(1, -20, 0, 30)
-voidBtn.Position = UDim2.new(0, 10, 0, 508)
-voidBtn.BackgroundColor3 = Color3.fromRGB(42, 62, 96)
-voidBtn.BorderSizePixel = 0
-voidBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-voidBtn.Font = Enum.Font.GothamBold
-voidBtn.TextSize = 12
-voidBtn.Text = voidBtnLabel(false)
-Instance.new("UICorner", voidBtn).CornerRadius = UDim.new(0, 6)
-
 -- Left keybind list (follows main when dragged); green = key held, red = not held
 local keybindSidebar = Instance.new("Frame")
 keybindSidebar.Name = "KeybindSidebar"
 keybindSidebar.Parent = main
 keybindSidebar.ZIndex = 8
-keybindSidebar.Size = UDim2.new(0, 120, 0, 178)
+keybindSidebar.Size = UDim2.new(0, 120, 0, 132)
 keybindSidebar.Position = UDim2.new(0, -128, 0, 70)
 keybindSidebar.BackgroundColor3 = Color3.fromRGB(24, 24, 32)
 keybindSidebar.BorderSizePixel = 1
@@ -1193,13 +1158,11 @@ end
 
 local orbitKeyPickBtn, orbitKeyStatusDot = makeKeyRow(48, "Orbit")
 orbitKeyPickBtn.Name = "OrbitKeyPick"
-local voidKeyPickBtn, voidKeyStatusDot = makeKeyRow(72, "Void")
-voidKeyPickBtn.Name = "VoidKeyPick"
 
 local ksHint = Instance.new("TextLabel")
 ksHint.Parent = keybindSidebar
 ksHint.Size = UDim2.new(1, -8, 0, 28)
-ksHint.Position = UDim2.new(0, 4, 0, 96)
+ksHint.Position = UDim2.new(0, 4, 0, 72)
 ksHint.BackgroundTransparency = 1
 ksHint.Font = Enum.Font.Gotham
 ksHint.TextSize = 9
@@ -1211,7 +1174,6 @@ ksHint.Text = "키 칸 클릭 → 키 누르기. Esc 취소. 누르는 동안 �
 
 local function refreshKeyBindUI()
     orbitBtn.Text = orbitBtnLabel(orbitEnabled)
-    voidBtn.Text = voidBtnLabel(voidEnabled)
     keybindMasterBtn.Text = keybindHotkeysEnabled and "단축키: ON" or "단축키: OFF"
     keybindMasterBtn.BackgroundColor3 = keybindHotkeysEnabled and Color3.fromRGB(48, 62, 52) or Color3.fromRGB(62, 48, 48)
     if keybindCaptureMode == "orbit" then
@@ -1220,13 +1182,6 @@ local function refreshKeyBindUI()
     else
         orbitKeyPickBtn.Text = KEYBIND_ORBIT_TOGGLE and KEYBIND_ORBIT_TOGGLE.Name or "없음"
         orbitKeyPickBtn.BackgroundColor3 = Color3.fromRGB(46, 46, 60)
-    end
-    if keybindCaptureMode == "void" then
-        voidKeyPickBtn.Text = "…"
-        voidKeyPickBtn.BackgroundColor3 = Color3.fromRGB(55, 80, 125)
-    else
-        voidKeyPickBtn.Text = KEYBIND_VOID_TOGGLE and KEYBIND_VOID_TOGGLE.Name or "없음"
-        voidKeyPickBtn.BackgroundColor3 = Color3.fromRGB(46, 46, 60)
     end
 end
 
@@ -1241,15 +1196,6 @@ orbitKeyPickBtn.MouseButton1Click:Connect(function()
         keybindCaptureMode = nil
     else
         keybindCaptureMode = "orbit"
-    end
-    refreshKeyBindUI()
-end)
-
-voidKeyPickBtn.MouseButton1Click:Connect(function()
-    if keybindCaptureMode == "void" then
-        keybindCaptureMode = nil
-    else
-        keybindCaptureMode = "void"
     end
     refreshKeyBindUI()
 end)
@@ -1269,18 +1215,7 @@ RunService.RenderStepped:Connect(function()
         dot.BackgroundColor3 = down and KEY_STATUS_DOWN or KEY_STATUS_UP
     end
     setDot(orbitKeyStatusDot, KEYBIND_ORBIT_TOGGLE)
-    setDot(voidKeyStatusDot, KEYBIND_VOID_TOGGLE)
 end)
-
-local voidHideSlider = createSlider(main, 546, "Void Hide Time", 0.05, 10, voidHideTime, 2, function(v)
-    voidHideTime = v
-end)
-
-local voidAttackSlider = createSlider(main, 596, "Void Attack Time", 0.05, 10, voidAttackTime, 2, function(v)
-    voidAttackTime = v
-end)
-
--- In Void UI removed
 
 -- ESP UI
 local espBtn = Instance.new("TextButton")
@@ -1523,8 +1458,6 @@ local function startTP()
 	local angle = 0
 	tp2Conn = RunService.RenderStepped:Connect(function(dt)
 		if not tp2Enabled then return end
-		-- avoid conflict with strong controllers
-		if voidEnabled or inVoidEnabled then return end
 		local myHRP = getMyHRP()
 		local target = getSelectedTargetPlayer() or findClosestAliveTarget()
 		local targetHRP = target and target.Character and target.Character:FindFirstChild("HumanoidRootPart")
@@ -2037,7 +1970,8 @@ end)
     U.loadCfgBtn = loadCfgBtn
     U.gui = gui
     U.saveCfgBtn = saveCfgBtn
-    U.voidBtn = voidBtn
+    U.topInfo = topInfo
+    U.topBanner = topBanner
     U.orbitBtn = orbitBtn
     U.espBtn = espBtn
     U.aaSpecialBtn = aaSpecialBtn
@@ -2052,8 +1986,6 @@ end)
     U.aaTornadoBtn = aaTornadoBtn
     U.aaIgnoreACBtn = aaIgnoreACBtn
     U.aaHardModeBtn = aaHardModeBtn
-    U.voidHideSlider = voidHideSlider
-    U.voidAttackSlider = voidAttackSlider
     U.tpSpeedSlider = tpSpeedSlider
     U.tpRadSlider = tpRadSlider
     U.tpHeightSlider = tpHeightSlider
@@ -2095,7 +2027,6 @@ local function applyRegularUiMode()
     if U.mvTabBtn then U.mvTabBtn.Visible = false end
     if U.orbitBtn then U.orbitBtn.Visible = false end
     if U.orbitPatternBtn then U.orbitPatternBtn.Visible = false end
-    if U.voidBtn then U.voidBtn.Visible = false end
     if U.espBtn then U.espBtn.Visible = false end
     if U.saveCfgBtn then U.saveCfgBtn.Visible = false end
     if U.loadCfgBtn then U.loadCfgBtn.Visible = false end
@@ -2118,8 +2049,11 @@ local function applyRegularUiMode()
     tpRadius = REGULAR_TP_RADIUS
     tpInterval = REGULAR_TP_INTERVAL
     KEYBIND_ORBIT_TOGGLE = Enum.KeyCode.Z
-    KEYBIND_VOID_TOGGLE = nil
     keybindCaptureMode = nil
+    if U.topBanner then
+        U.topBanner.Text = "Ice Lua REGULAR https://discord.gg/NDMCnpmCjG\nOrbit: Z 키로 켜기 / 끄기"
+        U.topBanner.TextWrapped = true
+    end
     for i, n in ipairs(orbitPatterns) do
         if n == "Random" then
             orbitPatternIndex = i
@@ -2586,25 +2520,20 @@ local t = time()
         end
 
         pcall(function()
-            -- Void/InVoid 중에는 HRP 강제 회전을 적용하지 않아 텔레포트/이동 간섭을 피한다
-            if not (voidEnabled or inVoidEnabled) then
-                -- 현재 몸이 보고 있는 방향(look) 기준으로 회전 적용
-                local cf = hrp.CFrame
-                local pos = cf.Position
-                local look = cf.LookVector
-                local base = CFrame.new(pos, pos + look)
-                aaLastRot = rot
-                -- Off 상태면 각도 적용 스킵(방향 고정 방지)
-                if aaPitchMode == "Off" and not aaSpinOn and not aaRollOn and aaSpecialMode == "Off" then
-                    -- no-op
-                else
-                    hrp.CFrame = base * rot
-                end
-                if aaHardMode then
-                    hrp.AssemblyAngularVelocity = Vector3.zero
-                end
+            -- 현재 몸이 보고 있는 방향(look) 기준으로 회전 적용
+            local cf = hrp.CFrame
+            local pos = cf.Position
+            local look = cf.LookVector
+            local base = CFrame.new(pos, pos + look)
+            aaLastRot = rot
+            -- Off 상태면 각도 적용 스킵(방향 고정 방지)
+            if aaPitchMode == "Off" and not aaSpinOn and not aaRollOn and aaSpecialMode == "Off" then
+                -- no-op
             else
-                aaLastRot = rot
+                hrp.CFrame = base * rot
+            end
+            if aaHardMode then
+                hrp.AssemblyAngularVelocity = Vector3.zero
             end
         end)
         -- NoHead 해제: 다른 모드에서는 Neck C0를 기본값으로 되돌림
@@ -2636,7 +2565,6 @@ local t = time()
     if aaSteppedConn then aaSteppedConn:Disconnect() end
     aaSteppedConn = RunService.Stepped:Connect(function()
         if not isAntiAimActive() then return end
-        if voidEnabled or inVoidEnabled then return end -- Void/InVoid 중에는 강제 회전 스킵
         local hum = getMyHumanoid()
         local hrp = getMyHRP()
         if not hum or not hrp then return end
@@ -2658,10 +2586,10 @@ local function startAAWatchdog()
     if aaWatchConn then aaWatchConn:Disconnect() end
     aaWatchConn = RunService.Heartbeat:Connect(function()
         -- Orbit: one bad CFrame write can disconnect Heartbeat; keep flag ON but movement stops.
-        if orbitEnabled and not orbitConn then
+        -- Regular: Orbit은 Z로만 켜므로 자동 재연결하지 않음
+        if (not REGULAR_MODE) and orbitEnabled and not orbitConn then
             pcall(startOrbit)
         end
-        if (voidEnabled or inVoidEnabled) then return end
         if isAntiAimActive() and (not aaConn) then
             startAntiAim()
         end
@@ -2985,29 +2913,16 @@ local function attackSelectedOnce()
     if not myHRP or not targetHRP or not targetHum or targetHum.Health <= 0 then return false end
 
     local backCF = myHRP.CFrame
-    if voidEnabled and voidAnchorPos then
-        backCF = CFrame.new(voidAnchorPos)
-    end
     local look = targetHRP.CFrame.LookVector
     local right = targetHRP.CFrame.RightVector
     local pred = targetHRP.Position + targetHRP.AssemblyLinearVelocity * 0.05
 
-    local attackPoints
-    if voidEnabled then
-        -- void 공격은 뒤가 아니라 타겟 중심으로 바로 진입
-        attackPoints = {
-            pred,
-            pred + right * 0.35,
-            pred - right * 0.35,
-        }
-    else
-        -- 뒤/좌뒤/우뒤 3포인트를 빠르게 순회해서 명중률 극대화
-        attackPoints = {
-            pred - look * 2.0,
-            pred - look * 1.8 + right * 1.2,
-            pred - look * 1.8 - right * 1.2,
-        }
-    end
+    -- 뒤/좌뒤/우뒤 3포인트를 빠르게 순회해서 명중률 극대화
+    local attackPoints = {
+        pred - look * 2.0,
+        pred - look * 1.8 + right * 1.2,
+        pred - look * 1.8 - right * 1.2,
+    }
     pcall(function()
         for _, p in ipairs(attackPoints) do
             myHRP.CFrame = CFrame.new(p, pred)
@@ -3028,93 +2943,6 @@ end
 
 -- Rage removed
 
-local function stopVoid()
-    voidEnabled = false
-    voidThread = nil
-    U.voidBtn.Text = voidBtnLabel(false)
-    U.voidBtn.BackgroundColor3 = Color3.fromRGB(42, 62, 96)
-    pcall(function()
-        UIS.MouseBehavior = Enum.MouseBehavior.Default
-    end)
-end
-
--- In Void logic removed
-
-local function startVoid()
-    if REGULAR_MODE then
-        voidEnabled = false
-        return
-    end
-    voidEnabled = true
-    U.voidBtn.Text = voidBtnLabel(true)
-    U.voidBtn.BackgroundColor3 = Color3.fromRGB(78, 112, 200)
-
-    local thisThread = {}
-    voidThread = thisThread
-    task.spawn(function()
-        local baseHRP = getMyHRP()
-        if baseHRP then
-            -- 너무 낮거나 지형 아래로 빠져 죽지 않도록 안전한 높이로 고정
-            voidAnchorPos = Vector3.new(
-                baseHRP.Position.X + voidDistanceStuds,
-                math.max(baseHRP.Position.Y + 1500, 1500),
-                baseHRP.Position.Z + voidDistanceStuds
-            )
-        end
-
-        while voidEnabled and voidThread == thisThread do
-            local myHRP = getMyHRP()
-            local myHum = getMyHumanoid()
-            if not myHRP then
-                task.wait(0.1)
-                continue
-            end
-            if myHum and myHum.Health <= 0 then
-                task.wait(0.2)
-                continue
-            end
-
-            if not voidAnchorPos then
-                voidAnchorPos = Vector3.new(
-                    myHRP.Position.X + voidDistanceStuds,
-                    math.max(myHRP.Position.Y + 1500, 1500),
-                    myHRP.Position.Z + voidDistanceStuds
-                )
-            end
-
-            local voidPos = voidAnchorPos
-            local hideUntil = tick() + voidHideTime
-            while voidEnabled and voidThread == thisThread and tick() < hideUntil do
-                local hrp = getMyHRP()
-                if hrp then
-                    pcall(function()
-                        hrp.CFrame = CFrame.new(voidPos)
-                        hrp.AssemblyLinearVelocity = Vector3.zero
-                    end)
-                end
-                task.wait(0.005)
-            end
-
-            local attackUntil = tick() + voidAttackTime
-            while voidEnabled and voidThread == thisThread and tick() < attackUntil do
-                -- 공격 직전에도 void 기준점에서 출발하도록 강제
-                local hrp = getMyHRP()
-                if hrp then
-                    pcall(function()
-                        hrp.CFrame = CFrame.new(voidPos)
-                        hrp.AssemblyLinearVelocity = Vector3.zero
-                    end)
-                end
-                local attacked = attackSelectedOnce() -- 타겟으로 갔다가 바로 voidPos로 복귀
-                if not attacked then
-                    task.wait(0.005)
-                end
-                task.wait(0.015)
-            end
-        end
-    end)
-end
-
 local function collectConfig()
     return {
         orbitSpeed = orbitSpeed,
@@ -3126,19 +2954,15 @@ local function collectConfig()
 		tp2Speed = tp2Speed,
 		-- uiScale removed
         orbitPatternIndex = orbitPatternIndex,
-        voidHideTime = voidHideTime,
-        voidAttackTime = voidAttackTime,
         -- Moving params
 		-- (removed others) keep crouch only
 		mvCrouchTempo = mvCrouchTempo,
 		mvCrouchDepth = mvCrouchDepth,
         selectedTargetName = selectedTargetName,
         keybindOrbitName = KEYBIND_ORBIT_TOGGLE and KEYBIND_ORBIT_TOGGLE.Name or "",
-        keybindVoidName = KEYBIND_VOID_TOGGLE and KEYBIND_VOID_TOGGLE.Name or "",
         keybindHotkeysEnabled = keybindHotkeysEnabled,
         states = {
             orbitEnabled = orbitEnabled,
-            voidEnabled = voidEnabled,
             espEnabled = espEnabled,
             mvEnabled = mvEnabled,
 			-- keep crouch only
@@ -3172,8 +2996,6 @@ local function applyConfig(cfg)
 	if type(cfg.tp2Height) == "number" then U.tpHeightSlider.setValue(cfg.tp2Height) end
 	if type(cfg.tp2Radius) == "number" then U.tpRadSlider.setValue(cfg.tp2Radius) end
 	if type(cfg.tp2Speed) == "number" then U.tpSpeedSlider.setValue(cfg.tp2Speed) end
-    if type(cfg.voidHideTime) == "number" then U.voidHideSlider.setValue(cfg.voidHideTime) end
-    if type(cfg.voidAttackTime) == "number" then U.voidAttackSlider.setValue(cfg.voidAttackTime) end
     -- Moving params
 	if type(cfg.mvCrouchTempo) == "number" then U.crouchTempoSlider.setValue(cfg.mvCrouchTempo) end
 	if type(cfg.mvCrouchDepth) == "number" then U.crouchDepthSlider.setValue(cfg.mvCrouchDepth) end
@@ -3183,9 +3005,6 @@ local function applyConfig(cfg)
     end
     if type(cfg.keybindOrbitName) == "string" then
         KEYBIND_ORBIT_TOGGLE = keyCodeFromName(cfg.keybindOrbitName)
-    end
-    if type(cfg.keybindVoidName) == "string" then
-        KEYBIND_VOID_TOGGLE = keyCodeFromName(cfg.keybindVoidName)
     end
     if type(cfg.keybindHotkeysEnabled) == "boolean" then
         keybindHotkeysEnabled = cfg.keybindHotkeysEnabled
@@ -3197,11 +3016,11 @@ local function applyConfig(cfg)
 
     local st = cfg.states
     if type(st) == "table" then
-        if st.orbitEnabled then startOrbit() else stopOrbit() end
+        -- Regular: 저장된 Orbit 상태로 자동 시작하지 않음 (Z로만 켜기)
         if REGULAR_MODE then
-            stopVoid()
+            stopOrbit()
         else
-            if st.voidEnabled then startVoid() else stopVoid() end
+            if st.orbitEnabled then startOrbit() else stopOrbit() end
         end
         if st.espEnabled then startESP() else stopESP() end
         if type(st.mvEnabled) == "boolean" then
@@ -3261,18 +3080,6 @@ end
 
 -- Rage binding removed
 
-U.voidBtn.MouseButton1Click:Connect(function()
-    if REGULAR_MODE then
-        stopVoid()
-        return
-    end
-    if voidEnabled then
-        stopVoid()
-    else
-        startVoid()
-    end
-end)
-
 UIS.InputBegan:Connect(function(input, _gameProcessed)
     if input.UserInputType == Enum.UserInputType.Keyboard then
         local k = input.KeyCode
@@ -3286,15 +3093,7 @@ UIS.InputBegan:Connect(function(input, _gameProcessed)
                 return
             end
             if keybindCaptureMode == "orbit" then
-                if KEYBIND_VOID_TOGGLE == k then
-                    KEYBIND_VOID_TOGGLE = nil
-                end
                 KEYBIND_ORBIT_TOGGLE = k
-            elseif keybindCaptureMode == "void" then
-                if KEYBIND_ORBIT_TOGGLE == k then
-                    KEYBIND_ORBIT_TOGGLE = nil
-                end
-                KEYBIND_VOID_TOGGLE = k
             end
             keybindCaptureMode = nil
             U.refreshKeyBindUI()
@@ -3321,12 +3120,6 @@ UIS.InputBegan:Connect(function(input, _gameProcessed)
             stopOrbit()
         else
             startOrbit()
-        end
-    elseif (not REGULAR_MODE) and KEYBIND_VOID_TOGGLE and k == KEYBIND_VOID_TOGGLE then
-        if voidEnabled then
-            stopVoid()
-        else
-            startVoid()
         end
     end
 end)
@@ -3530,15 +3323,12 @@ __hookAllToolsNow()
 
 
 LP.CharacterAdded:Connect(function()
-    if orbitEnabled then
+    -- Regular: 리스폰 후에도 Orbit은 Z로 다시 켜기
+    if (not REGULAR_MODE) and orbitEnabled then
         task.wait(0.2)
         startOrbit()
     end
     -- Drone removed
-    if voidEnabled then
-        task.wait(0.2)
-        startVoid()
-    end
     -- In Void removed
     -- Rebind Anti-Aim on respawn
     if isAntiAimActive() then
