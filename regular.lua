@@ -3074,6 +3074,9 @@ local function applyConfig(cfg)
 		end
         startAntiAim()
     end
+    if REGULAR_MODE then
+        KEYBIND_ORBIT_TOGGLE = Enum.KeyCode.Z
+    end
     U.refreshKeyBindUI()
     return true
 end
@@ -3385,9 +3388,6 @@ if REGULAR_MODE then
                         if U.targetLabel then U.targetLabel.Text = "Target: " .. selectedTargetName end
                         pcall(updatePlayerButtonHighlights)
                     end
-                end
-                if not orbitEnabled then
-                    pcall(startOrbit)
                 end
             end
         end
