@@ -96,7 +96,7 @@ local topDistLabelRef = nil
 
 -- Executor workspace (Synapse/Krnl 등): Ice Lua/config 아래에 저장
 local SETTINGS_REL_DIR = "Ice Lua/config"
-local SETTINGS_FILENAME = "Simple_Draggable_Toggle_UI_Config.json"
+local SETTINGS_FILENAME = "Simple_Draggable_Toggle_UI_PRIVATE_Config.json"
 local SETTINGS_FILE = SETTINGS_REL_DIR .. "/" .. SETTINGS_FILENAME
 -- 예전 버전: 워크스페이스 루트에만 있던 파일 (로드 폴백)
 local SETTINGS_FILE_LEGACY = SETTINGS_FILENAME
@@ -582,7 +582,7 @@ end
 
 -- Key system (server verify: key + hwid; IP는 서버가 요청에서 읽어 묶음)
 local KEYSYS_API_URL = "https://lua-key-server-production.up.railway.app/verify"
-local KEYSYS_CACHE_FILE = SETTINGS_REL_DIR .. "/Simple_Draggable_Toggle_UI_KeyCache.json"
+local KEYSYS_CACHE_FILE = SETTINGS_REL_DIR .. "/Simple_Draggable_Toggle_UI_PRIVATE_KeyCache.json"
 local KEYSYS_ALLOWED_TIERS = { private = true, premium = true }
 local keyAuthPassed = false
 
@@ -781,7 +781,7 @@ topBanner.Parent = topInfo
 topBanner.Size = UDim2.new(1, -12, 0, 26)
 topBanner.Position = UDim2.new(0, 6, 0, 4)
 topBanner.BackgroundTransparency = 1
-topBanner.Text = "Ice Lua https://discord.gg/NDMCnpmCjG"
+topBanner.Text = "Ice Lua PRIVATE https://discord.gg/NDMCnpmCjG"
 topBanner.TextColor3 = Color3.fromRGB(235, 235, 245)
 topBanner.Font = Enum.Font.GothamBold
 topBanner.TextSize = 17
@@ -1042,6 +1042,7 @@ local function createSlider(parent, y, titleText, minV, maxV, startV, decimals, 
 
     setValue(startV)
     return {
+        root = holder,
         setValue = setValue,
         getValue = function() return value end,
     }
@@ -2067,6 +2068,19 @@ end)
     U.aaRollSlider = aaRollSlider
 end
 buildMainUI()
+
+local function applyPrivatePatternOnlyUI()
+    if U.speedSlider and U.speedSlider.root then
+        U.speedSlider.root.Visible = false
+    end
+    if U.distanceSlider and U.distanceSlider.root then
+        U.distanceSlider.root.Visible = false
+    end
+    if U.intervalSlider and U.intervalSlider.root then
+        U.intervalSlider.root.Visible = false
+    end
+end
+applyPrivatePatternOnlyUI()
 
 local function getOrbitOffset(patternName, angle, radius)
     local r = math.max(radius, 0.001)
