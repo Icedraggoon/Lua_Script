@@ -195,6 +195,8 @@ local RIVALS_PLACE_ID = 17625359962
 local aaTornadoAnim = nil
 local aaTornadoTrack = nil
 local aaTornadoRemoteLast = 0
+local aaRivalsTornadoCandidates = nil
+local aaRivalsTornadoCandidateIndex = 1
 
 -- Drone removed
 local droneEnabled = false
@@ -335,6 +337,71 @@ local function ensureTornadoAnimTrack(hum)
     end)
 end
 
+local function buildRivalsTornadoCandidates()
+    if aaRivalsTornadoCandidates then
+        return aaRivalsTornadoCandidates
+    end
+    local out = {}
+    local seen = {}
+    local function push(name)
+        if type(name) ~= "string" then return end
+        local n = string.gsub(name, "^%s+", "")
+        n = string.gsub(n, "%s+$", "")
+        if n == "" then return end
+        if seen[n] then return end
+        seen[n] = true
+        table.insert(out, n)
+    end
+    -- seed with safe defaults
+    push("IlluminaStorm")
+    push("Tornado")
+    push("Storm")
+    push("Twister")
+
+    pcall(function()
+        local rs = game:GetService("ReplicatedStorage")
+        local modules = rs:FindFirstChild("Modules")
+        local cosmetics = modules and modules:FindFirstChild("CosmeticLibrary")
+        if cosmetics and cosmetics:IsA("ModuleScript") then
+            local ok, lib = pcall(require, cosmetics)
+            if ok and type(lib) == "table" and type(lib.Cosmetics) == "table" then
+                for name, info in pairs(lib.Cosmetics) do
+                    local n = tostring(name)
+                    local s = string.lower(n)
+                    if type(info) == "table" and info.Type == "Emote" then
+                        if string.find(s, "storm", 1, true)
+                            or string.find(s, "tornado", 1, true)
+                            or string.find(s, "twister", 1, true)
+                            or string.find(s, "cyclone", 1, true)
+                            or string.find(s, "spin", 1, true)
+                            or string.find(s, "illumina", 1, true) then
+                            push(n)
+                        end
+                    end
+                end
+            end
+        end
+        local emotesFolder = modules and modules:FindFirstChild("Emotes")
+        if emotesFolder then
+            for _, child in ipairs(emotesFolder:GetChildren()) do
+                local n = tostring(child.Name)
+                local s = string.lower(n)
+                if string.find(s, "storm", 1, true)
+                    or string.find(s, "tornado", 1, true)
+                    or string.find(s, "twister", 1, true)
+                    or string.find(s, "cyclone", 1, true)
+                    or string.find(s, "spin", 1, true)
+                    or string.find(s, "illumina", 1, true) then
+                    push(n)
+                end
+            end
+        end
+    end)
+
+    aaRivalsTornadoCandidates = out
+    return out
+end
+
 local function tryReplicateTornadoForRivals()
     if game.PlaceId ~= RIVALS_PLACE_ID then
         return
@@ -354,11 +421,17 @@ local function tryReplicateTornadoForRivals()
             return
         end
         -- 게임별 서버 검증을 통과하는 이름이 있을 때만 전체 복제됨
-        for _, name in ipairs({ "IlluminaStorm", "Tornado", AA_TORNADO_ANIM_ID }) do
-            pcall(function()
-                useEmote:FireServer(name)
-            end)
+        local list = buildRivalsTornadoCandidates()
+        if #list > 0 then
+            if aaRivalsTornadoCandidateIndex > #list then
+                aaRivalsTornadoCandidateIndex = 1
+            end
+            local name = list[aaRivalsTornadoCandidateIndex]
+            aaRivalsTornadoCandidateIndex = aaRivalsTornadoCandidateIndex + 1
+            pcall(function() useEmote:FireServer(name) end)
         end
+        -- id 직접 시도는 마지막 폴백 (서버가 막는 경우 많음)
+        pcall(function() useEmote:FireServer(AA_TORNADO_ANIM_ID) end)
     end)
 end
 
@@ -2395,6 +2468,15 @@ local t = time()
             lerpJointC0(aaJoints.waist, aaBase.waistC0, CFrame.Angles(0.85, 0, 0), a)
             lerpJointC0(aaJoints.neck, aaBase.neckC0, CFrame.Angles(1.20, 0, 0), a)
             ensureTornadoAnimTrack(hum)
+            if aaTornadoTrack then
+                pcall(function()
+                    if not aaTornadoTrack.IsPlaying then
+                        aaTornadoTrack:Play(0.03, 1, 1.12)
+                    end
+                    aaTornadoTrack:AdjustWeight(1, 0.05)
+                    aaTornadoTrack:AdjustSpeed(1.12)
+                end)
+            end
             tryReplicateTornadoForRivals()
         elseif aaSpecialMode == "Forward" then
             local a = math.clamp(dt * 8, 0, 1)
