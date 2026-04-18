@@ -611,6 +611,37 @@ local function getRequestFn()
     return nil
 end
 
+local function getVerifyRequestFnList()
+    local list = {}
+    local function add(fn)
+        if type(fn) ~= "function" then
+            return
+        end
+        for _, f in ipairs(list) do
+            if f == fn then
+                return
+            end
+        end
+        table.insert(list, fn)
+    end
+    if type(http_request) == "function" then
+        add(http_request)
+    end
+    if type(syn) == "table" and type(syn.request) == "function" then
+        add(syn.request)
+    end
+    if type(fluxus) == "table" and type(fluxus.request) == "function" then
+        add(fluxus.request)
+    end
+    if type(request) == "function" then
+        add(request)
+    end
+    if type(krnl_request) == "function" then
+        add(krnl_request)
+    end
+    return list
+end
+
 -- keys.txt 등 "ICE-XXXX / 닉메모" 형태는 검증·저장 시 앞의 키만 사용 (뒤 / 주석은 넣지 않음)
 local function normalizeKeyInput(s)
     if type(s) ~= "string" then return "" end
@@ -659,8 +690,8 @@ local function verifyKeyWithServer(keyText)
         return false, "KEYSYS_API_URL을 Railway 주소로 바꿔주세요."
     end
 
-    local req = getRequestFn()
-    if not req then
+    local reqList = getVerifyRequestFnList()
+    if #reqList == 0 then
         return false, "request API를 지원하지 않는 실행기입니다."
     end
 
@@ -679,70 +710,171 @@ local function verifyKeyWithServer(keyText)
         return false, "요청 데이터 생성 실패"
     end
 
-    local requestOpts = {
-        Url = KEYSYS_API_URL,
-        Method = "POST",
-        Headers = {
+    local headerVariants = {
+        {
             ["Content-Type"] = "application/json",
             ["Accept"] = "application/json",
         },
-        Body = payload,
+        {
+            ["Content-Type"] = "application/json",
+            ["Accept"] = "application/json",
+            ["Expect"] = "",
+            ["Connection"] = "close",
+        },
+        {
+            ["Content-Type"] = "application/json",
+            ["Accept"] = "application/json",
+            ["Connection"] = "close",
+            ["Proxy-Connection"] = "close",
+        },
     }
 
-    local function runVerifyRequest()
-        return req(requestOpts)
-    end
+    local lastStatus = 0
+    local lastParsed = nil
 
-    local ok, resp = pcall(runVerifyRequest)
-    if not ok or type(resp) ~= "table" then
-        return false, "서버 요청 실패"
-    end
-
-    local status = tonumber(resp.StatusCode) or tonumber(resp.Status) or 0
-    local text = resp.Body or resp.body or ""
-
-    if status == 502 or status == 503 or status == 504 then
-        task.wait(0.5)
-        local ok2, resp2 = pcall(runVerifyRequest)
-        if ok2 and type(resp2) == "table" then
-            resp = resp2
-            status = tonumber(resp.StatusCode) or tonumber(resp.Status) or status
-            text = resp.Body or resp.body or text
+    local function applyResponse(resp)
+        if type(resp) ~= "table" then
+            return
+        end
+        local status = tonumber(resp.StatusCode) or tonumber(resp.Status) or 0
+        local text = resp.Body or resp.body or ""
+        lastStatus = status
+        lastParsed = nil
+        if type(text) == "string" and text ~= "" then
+            pcall(function()
+                lastParsed = HttpService:JSONDecode(text)
+            end)
         end
     end
 
-    local parsed = nil
-    if type(text) == "string" and text ~= "" then
-        pcall(function()
-            parsed = HttpService:JSONDecode(text)
-        end)
-    end
-
-    if status >= 200 and status < 300 then
-        if type(parsed) == "table" then
-            if parsed.ok == true or parsed.success == true or parsed.allowed == true then
-                local tier = "regular"
-                if type(parsed.tier) == "string" and parsed.tier ~= "" then
-                    tier = string.lower(parsed.tier)
-                end
-                if not KEYSYS_ALLOWED_TIERS[tier] then
-                    return false, "이 regular 버전에서 사용할 수 없는 키 등급입니다. (" .. tostring(tier) .. ")"
-                end
-                return true, tostring(parsed.message or "인증 성공")
+    for _, reqFn in ipairs(reqList) do
+        for _, hdr in ipairs(headerVariants) do
+            local opts = {
+                Url = KEYSYS_API_URL,
+                Method = "POST",
+                Headers = hdr,
+                Body = payload,
+            }
+            local ok, resp = pcall(function()
+                return reqFn(opts)
+            end)
+            if not ok or type(resp) ~= "table" then
+                continue
             end
-            return false, tostring(parsed.message or "인증 실패")
+            applyResponse(resp)
+
+            if lastStatus == 502 or lastStatus == 503 or lastStatus == 504 then
+                task.wait(0.5)
+                local ok2, resp2 = pcall(function()
+                    return reqFn(opts)
+                end)
+                if ok2 and type(resp2) == "table" then
+                    applyResponse(resp2)
+                end
+            end
+
+            if lastStatus >= 200 and lastStatus < 300 then
+                if type(lastParsed) == "table" then
+                    if lastParsed.ok == true or lastParsed.success == true or lastParsed.allowed == true then
+                        local tier = "regular"
+                        if type(lastParsed.tier) == "string" and lastParsed.tier ~= "" then
+                            tier = string.lower(lastParsed.tier)
+                        end
+                        if not KEYSYS_ALLOWED_TIERS[tier] then
+                            return false, "이 regular 버전에서 사용할 수 없는 키 등급입니다. (" .. tostring(tier) .. ")"
+                        end
+                        return true, tostring(lastParsed.message or "인증 성공")
+                    end
+                    return false, tostring(lastParsed.message or "인증 실패")
+                end
+                return true, "인증 성공"
+            end
+
+            if lastStatus ~= 407 and lastStatus ~= 417 then
+                break
+            end
         end
-        return true, "인증 성공"
+        if lastStatus ~= 407 and lastStatus ~= 417 then
+            break
+        end
     end
 
-    if type(parsed) == "table" and type(parsed.message) == "string" and parsed.message ~= "" then
-        return false, parsed.message
+    -- HTTP 417: POST + Expect: 100-continue 충돌이 흔함 → 본문 없는 GET /verify 로 재시도 (서버 최신 배포 필요)
+    if lastStatus == 417 then
+        local hwidGet = getBestHWID()
+        local sepChar = string.find(KEYSYS_API_URL, "?", 1, true) and "&" or "?"
+        local getUrl = KEYSYS_API_URL
+            .. sepChar
+            .. "key="
+            .. HttpService:UrlEncode(keyText)
+            .. "&hwid="
+            .. HttpService:UrlEncode(hwidGet)
+            .. "&userId="
+            .. HttpService:UrlEncode(tostring(LP.UserId))
+            .. "&placeId="
+            .. HttpService:UrlEncode(tostring(game.PlaceId))
+            .. "&gameId="
+            .. HttpService:UrlEncode(tostring(game.GameId))
+        local getHdr = {
+            ["Accept"] = "application/json",
+            ["Connection"] = "close",
+        }
+        for _, reqFn in ipairs(reqList) do
+            local okg, respg = pcall(function()
+                return reqFn({
+                    Url = getUrl,
+                    Method = "GET",
+                    Headers = getHdr,
+                })
+            end)
+            if not okg or type(respg) ~= "table" then
+                continue
+            end
+            applyResponse(respg)
+            if lastStatus == 502 or lastStatus == 503 or lastStatus == 504 then
+                task.wait(0.5)
+                local ok2, resp2 = pcall(function()
+                    return reqFn({
+                        Url = getUrl,
+                        Method = "GET",
+                        Headers = getHdr,
+                    })
+                end)
+                if ok2 and type(resp2) == "table" then
+                    applyResponse(resp2)
+                end
+            end
+            if lastStatus >= 200 and lastStatus < 300 then
+                if type(lastParsed) == "table" then
+                    if lastParsed.ok == true or lastParsed.success == true or lastParsed.allowed == true then
+                        local tier = "regular"
+                        if type(lastParsed.tier) == "string" and lastParsed.tier ~= "" then
+                            tier = string.lower(lastParsed.tier)
+                        end
+                        if not KEYSYS_ALLOWED_TIERS[tier] then
+                            return false, "이 regular 버전에서 사용할 수 없는 키 등급입니다. (" .. tostring(tier) .. ")"
+                        end
+                        return true, tostring(lastParsed.message or "인증 성공")
+                    end
+                    return false, tostring(lastParsed.message or "인증 실패")
+                end
+                return true, "인증 성공"
+            end
+        end
     end
-    if status == 407 then
+
+    if type(lastParsed) == "table" and type(lastParsed.message) == "string" and lastParsed.message ~= "" then
+        return false, lastParsed.message
+    end
+    if lastStatus == 407 then
         return false,
-            "HTTP 407: 프록시 인증(네트워크 가로채기). VPN·시스템 프록시 끄기, Wi‑Fi/데이터 전환, 다른 네트워크에서 재시도."
+            "HTTP 407: 프록시(중간망) 차단. VPN 끄기, 설정→프록시 OFF, Wi‑Fi↔데이터 전환. 관리자 CMD: netsh winhttp reset proxy 후 재부팅."
     end
-    return false, "인증 실패 (" .. tostring(status) .. ")"
+    if lastStatus == 417 then
+        return false,
+            "HTTP 417: POST Expect 충돌. 키 서버에 GET /verify 배포 후 재시도하거나 실행기·네트워크를 바꿔 주세요."
+    end
+    return false, "인증 실패 (" .. tostring(lastStatus) .. ")"
 end
 
 local U = {}
