@@ -1737,6 +1737,21 @@ local function setMainUnlocked(unlocked)
     main.Visible = keyAuthPassed
     toggleBtn.Visible = keyAuthPassed
     authGate.Visible = not keyAuthPassed
+    if not keyAuthPassed then
+        orbitEnabled = false
+        if orbitConn then
+            pcall(function()
+                orbitConn:Disconnect()
+            end)
+            orbitConn = nil
+        end
+        pcall(function()
+            if U and U.orbitBtn and U.orbitBtn.Parent then
+                U.orbitBtn.Text = orbitBtnLabel(false)
+                U.orbitBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 78)
+            end
+        end)
+    end
 end
 
 setMainUnlocked(false)
@@ -2618,6 +2633,9 @@ end
 -- (Silent Aim core removed)
 
 local function startOrbit()
+    if not keyAuthPassed then
+        return
+    end
     if orbitConn then orbitConn:Disconnect() end
     orbitEnabled = true
     U.orbitBtn.Text = orbitBtnLabel(true)
@@ -2625,7 +2643,7 @@ local function startOrbit()
 
     tpAccumulator = 0
     orbitConn = RunService.Heartbeat:Connect(function(dt)
-        if not orbitEnabled then return end
+        if not keyAuthPassed or not orbitEnabled then return end
         local me = getMyHRP()
         local target = getSelectedTargetPlayer() or findClosestAliveTarget()
         local hrp = target and target.Character and target.Character:FindFirstChild("HumanoidRootPart")
@@ -2674,6 +2692,9 @@ local function startOrbit()
 end
 
 U.orbitBtn.MouseButton1Click:Connect(function()
+    if not keyAuthPassed then
+        return
+    end
     if orbitEnabled then
         stopOrbit()
     else
@@ -3121,6 +3142,9 @@ UIS.InputBegan:Connect(function(input, _gameProcessed)
     local k = input.KeyCode
     -- gameProcessed는 많은 게임에서 F키까지 삼켜서 여기서는 보지 않음 (채팅 포커스만 막음)
     if KEYBIND_ORBIT_TOGGLE and k == KEYBIND_ORBIT_TOGGLE then
+        if not keyAuthPassed then
+            return
+        end
         if orbitEnabled then
             stopOrbit()
         else

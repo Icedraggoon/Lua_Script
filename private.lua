@@ -69,7 +69,7 @@ local tpInterval = 0.018 -- seconds between orbit TP steps (smaller = faster)
 local tpRadius = 6 -- studs
 local tpAccumulator = 0
 local orbitPatternIndex = 1
-local orbitPatterns = {"Circle", "Random spot"}
+local orbitPatterns = {"Random spot"}
 local orbitPatternNamesKo = nil
 local rageBurstHits = 2
 local selectedTargetName = ""
@@ -2079,6 +2079,9 @@ local function applyPrivatePatternOnlyUI()
     end
     if U.intervalSlider and U.intervalSlider.root then
         U.intervalSlider.root.Visible = false
+    end
+    if U.orbitPatternBtn and #orbitPatterns <= 1 then
+        U.orbitPatternBtn.Visible = false
     end
 end
 applyPrivatePatternOnlyUI()
