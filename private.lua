@@ -789,6 +789,16 @@ topBanner.TextSize = 17
 topBanner.TextXAlignment = Enum.TextXAlignment.Center
 topBanner.ZIndex = 3001
 
+local topOrbitDot = Instance.new("Frame")
+topOrbitDot.Name = "OrbitStatusDot"
+topOrbitDot.Parent = topInfo
+topOrbitDot.Size = UDim2.new(0, 11, 0, 11)
+topOrbitDot.Position = UDim2.new(0, 10, 0, 12)
+topOrbitDot.BackgroundColor3 = Color3.fromRGB(215, 65, 70)
+topOrbitDot.BorderSizePixel = 0
+topOrbitDot.ZIndex = 3002
+Instance.new("UICorner", topOrbitDot).CornerRadius = UDim.new(1, 0)
+
 local topDistLabel = Instance.new("TextLabel")
 topDistLabel.Name = "TopDistance"
 topDistLabel.Parent = topInfo
@@ -2067,8 +2077,18 @@ end)
     U.crouchDepthSlider = crouchDepthSlider
     U.aaSpinSlider = aaSpinSlider
     U.aaRollSlider = aaRollSlider
+    U.topOrbitDot = topOrbitDot
 end
 buildMainUI()
+
+local function updateTopOrbitIndicator()
+    local d = U.topOrbitDot
+    if not d or not d.Parent then
+        return
+    end
+    d.BackgroundColor3 = orbitEnabled and Color3.fromRGB(45, 195, 85) or Color3.fromRGB(215, 65, 70)
+end
+updateTopOrbitIndicator()
 
 local function applyPrivatePatternOnlyUI()
     if U.speedSlider and U.speedSlider.root then
@@ -2636,6 +2656,7 @@ local function stopOrbit()
     end
     U.orbitBtn.Text = orbitBtnLabel(false)
     U.orbitBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 78)
+    updateTopOrbitIndicator()
 end
  
 -- (Silent Aim core removed)
@@ -2687,6 +2708,7 @@ local function startOrbit()
             me.AssemblyLinearVelocity = Vector3.zero
         end)
     end)
+    updateTopOrbitIndicator()
 end
 
 U.orbitBtn.MouseButton1Click:Connect(function()

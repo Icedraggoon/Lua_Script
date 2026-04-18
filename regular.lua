@@ -771,6 +771,16 @@ topBanner.TextXAlignment = Enum.TextXAlignment.Center
 topBanner.TextWrapped = true
 topBanner.ZIndex = 3001
 
+local topOrbitDot = Instance.new("Frame")
+topOrbitDot.Name = "OrbitStatusDot"
+topOrbitDot.Parent = topInfo
+topOrbitDot.Size = UDim2.new(0, 11, 0, 11)
+topOrbitDot.Position = UDim2.new(0, 10, 0, 18)
+topOrbitDot.BackgroundColor3 = Color3.fromRGB(215, 65, 70)
+topOrbitDot.BorderSizePixel = 0
+topOrbitDot.ZIndex = 3002
+Instance.new("UICorner", topOrbitDot).CornerRadius = UDim.new(1, 0)
+
 local topDistLabel = Instance.new("TextLabel")
 topDistLabel.Name = "TopDistance"
 topDistLabel.Parent = topInfo
@@ -1750,6 +1760,9 @@ local function setMainUnlocked(unlocked)
                 U.orbitBtn.Text = orbitBtnLabel(false)
                 U.orbitBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 78)
             end
+            if U and U.topOrbitDot and U.topOrbitDot.Parent then
+                U.topOrbitDot.BackgroundColor3 = Color3.fromRGB(215, 65, 70)
+            end
         end)
     end
 end
@@ -1987,6 +2000,7 @@ end)
     U.saveCfgBtn = saveCfgBtn
     U.topInfo = topInfo
     U.topBanner = topBanner
+    U.topOrbitDot = topOrbitDot
     U.orbitBtn = orbitBtn
     U.espBtn = espBtn
     U.aaSpecialBtn = aaSpecialBtn
@@ -2083,6 +2097,15 @@ end
 
 buildMainUI()
 applyRegularUiMode()
+
+local function updateTopOrbitIndicator()
+    local d = U.topOrbitDot
+    if not d or not d.Parent then
+        return
+    end
+    d.BackgroundColor3 = orbitEnabled and Color3.fromRGB(45, 195, 85) or Color3.fromRGB(215, 65, 70)
+end
+updateTopOrbitIndicator()
 
 local function getOrbitOffset(patternName, angle, radius)
     local r = math.max(radius, 0.001)
@@ -2628,6 +2651,7 @@ local function stopOrbit()
     end
     U.orbitBtn.Text = orbitBtnLabel(false)
     U.orbitBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 78)
+    updateTopOrbitIndicator()
 end
  
 -- (Silent Aim core removed)
@@ -2689,6 +2713,7 @@ local function startOrbit()
             me.AssemblyLinearVelocity = Vector3.zero
         end)
     end)
+    updateTopOrbitIndicator()
 end
 
 U.orbitBtn.MouseButton1Click:Connect(function()
