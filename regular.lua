@@ -67,7 +67,7 @@ local selectedTargetName = ""
 local REGULAR_MODE = true
 local REGULAR_ORBIT_SPEED = 4500
 local REGULAR_TP_RADIUS = 700000
-local REGULAR_TP_INTERVAL = 0.0001
+local REGULAR_TP_INTERVAL = 1 -- Orbit TP time (seconds)
 
 local espEnabled = false
 local espConn = nil
@@ -763,7 +763,7 @@ topBanner.Parent = topInfo
 topBanner.Size = UDim2.new(1, -12, 0, 40)
 topBanner.Position = UDim2.new(0, 6, 0, 4)
 topBanner.BackgroundTransparency = 1
-topBanner.Text = "Ice Lua REGULAR https://discord.gg/NDMCnpmCjG"
+topBanner.Text = "Ice Lua REGULAR https://discord.gg/NDMCnpmCjG\nOrbit: Press Z to toggle"
 topBanner.TextColor3 = Color3.fromRGB(235, 235, 245)
 topBanner.Font = Enum.Font.GothamBold
 topBanner.TextSize = 17
@@ -2051,7 +2051,7 @@ local function applyRegularUiMode()
     KEYBIND_ORBIT_TOGGLE = Enum.KeyCode.Z
     keybindCaptureMode = nil
     if U.topBanner then
-        U.topBanner.Text = "Ice Lua REGULAR https://discord.gg/NDMCnpmCjG\nOrbit: Z 키로 켜기 / 끄기"
+        U.topBanner.Text = "Ice Lua REGULAR https://discord.gg/NDMCnpmCjG\nOrbit: Press Z to toggle"
         U.topBanner.TextWrapped = true
     end
     for i, n in ipairs(orbitPatterns) do
@@ -2986,7 +2986,7 @@ local function applyConfig(cfg)
 
     if type(cfg.orbitSpeed) == "number" then U.speedSlider.setValue(cfg.orbitSpeed) end
     if type(cfg.tpRadius) == "number" then U.distanceSlider.setValue(cfg.tpRadius) end
-    if type(cfg.tpInterval) == "number" then U.intervalSlider.setValue(cfg.tpInterval) end
+    if (not REGULAR_MODE) and type(cfg.tpInterval) == "number" then U.intervalSlider.setValue(cfg.tpInterval) end
 	-- uiScale removed
     if type(cfg.orbitPatternIndex) == "number" then
         orbitPatternIndex = math.clamp(math.floor(cfg.orbitPatternIndex), 1, #orbitPatterns)
@@ -3076,6 +3076,8 @@ local function applyConfig(cfg)
     end
     if REGULAR_MODE then
         KEYBIND_ORBIT_TOGGLE = Enum.KeyCode.Z
+        tpInterval = REGULAR_TP_INTERVAL
+        if U.intervalSlider and U.intervalSlider.setValue then U.intervalSlider.setValue(tpInterval) end
     end
     U.refreshKeyBindUI()
     return true
