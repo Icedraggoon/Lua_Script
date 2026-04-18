@@ -94,6 +94,7 @@ local espConn = nil
 local espPool = {}
 -- 워터마크 거리 줄 (buildMainUI에서 할당)
 local topDistLabelRef = nil
+local findClosestAliveTarget
 
 -- Executor workspace (Synapse/Krnl 등): Ice Lua/config 아래에 저장
 local SETTINGS_REL_DIR = "Ice Lua/config"
@@ -2742,7 +2743,7 @@ local function findTargetPlayer(nameText)
     return best
 end
 
-local function findClosestAliveTarget()
+findClosestAliveTarget = function()
     local myHRP = getMyHRP()
     local bestPlayer = nil
     local bestDist = math.huge

@@ -74,6 +74,8 @@ local espConn = nil
 local espPool = {}
 -- 워터마크 거리 줄 (buildMainUI에서 할당)
 local topDistLabelRef = nil
+-- startOrbit Heartbeat보다 아래에 정의되므로 forward 선언 (nil 호출 방지)
+local findClosestAliveTarget
 
 -- Executor workspace (Synapse/Krnl 등): Ice Lua/config 아래에 저장
 local SETTINGS_REL_DIR = "Ice Lua/config"
@@ -2750,7 +2752,7 @@ local function findTargetPlayer(nameText)
     return best
 end
 
-local function findClosestAliveTarget()
+findClosestAliveTarget = function()
     local myHRP = getMyHRP()
     local bestPlayer = nil
     local bestDist = math.huge
