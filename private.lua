@@ -697,23 +697,39 @@ local function verifyKeyWithServer(keyText)
         return false, "요청 데이터 생성 실패"
     end
 
-    local ok, resp = pcall(function()
-        return req({
-            Url = KEYSYS_API_URL,
-            Method = "POST",
-            Headers = {
-                ["Content-Type"] = "application/json",
-                ["Accept"] = "application/json",
-            },
-            Body = payload,
-        })
-    end)
+    local requestOpts = {
+        Url = KEYSYS_API_URL,
+        Method = "POST",
+        Headers = {
+            ["Content-Type"] = "application/json",
+            ["Accept"] = "application/json",
+        },
+        Body = payload,
+    }
+
+    local function runVerifyRequest()
+        return req(requestOpts)
+    end
+
+    local ok, resp = pcall(runVerifyRequest)
     if not ok or type(resp) ~= "table" then
         return false, "서버 요청 실패"
     end
 
     local status = tonumber(resp.StatusCode) or tonumber(resp.Status) or 0
     local text = resp.Body or resp.body or ""
+
+    -- Railway 재시작·콜드스타트 등 일시 오류 1회 재시도
+    if status == 502 or status == 503 or status == 504 then
+        task.wait(0.5)
+        local ok2, resp2 = pcall(runVerifyRequest)
+        if ok2 and type(resp2) == "table" then
+            resp = resp2
+            status = tonumber(resp.StatusCode) or tonumber(resp.Status) or status
+            text = resp.Body or resp.body or text
+        end
+    end
+
     local parsed = nil
     if type(text) == "string" and text ~= "" then
         pcall(function()
@@ -740,6 +756,11 @@ local function verifyKeyWithServer(keyText)
 
     if type(parsed) == "table" and type(parsed.message) == "string" and parsed.message ~= "" then
         return false, parsed.message
+    end
+    -- 407 = Proxy Authentication Required (키 서버가 아니라 중간 프록시/통신사/학교망 등)
+    if status == 407 then
+        return false,
+            "HTTP 407: 프록시 인증(네트워크 가로채기). VPN·시스템 프록시 끄기, Wi‑Fi/데이터 전환, 다른 네트워크에서 재시도."
     end
     return false, "인증 실패 (" .. tostring(status) .. ")"
 end
