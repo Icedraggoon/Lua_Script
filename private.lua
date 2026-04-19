@@ -218,6 +218,11 @@ local voidDistanceStuds = 200000000
 local voidAnchorPos = nil
 local voidReturnCFrame = nil
 
+-- 수억 studs 단발 텔레포트는 서버/복제에서 무시되거나 클라만 적용되는 경우가 많음 (상대 화면은 제자리).
+-- Rivals(17625359962): 급격한 HRP 이동이 상대에게 안 잡히는 경우가 많아 한도를 더 낮춤(맵 밖 ‘회색 링’만 보이고 상대는 제자리로 보일 수 있음).
+local VOID_MAX_REPLICATE_OFFSET_STUDS = (game.PlaceId == 17625359962) and 96000 or 450000
+local voidPostSimConn = nil
+
 -- InVoid removed
 local inVoidEnabled = false
 local inVoidThread = nil
@@ -1108,7 +1113,7 @@ topDistLabelRef = topDistLabel
 local main = Instance.new("Frame")
 main.Name = "MainUI"
 main.Parent = gui
-main.Size = UDim2.new(0, 340, 0, 882)
+main.Size = UDim2.new(0, 340, 0, 880)
 main.Position = UDim2.new(0.5, -140, 0.5, -120)
 main.BackgroundColor3 = Color3.fromRGB(28, 28, 35)
 main.BorderSizePixel = 1
@@ -1423,7 +1428,7 @@ listLayout.Padding = UDim.new(0, 4)
 local voidBtn = Instance.new("TextButton")
 voidBtn.Parent = main
 voidBtn.Size = UDim2.new(1, -20, 0, 30)
-voidBtn.Position = UDim2.new(0, 10, 0, 556)
+voidBtn.Position = UDim2.new(0, 10, 0, 522)
 voidBtn.BackgroundColor3 = Color3.fromRGB(42, 62, 96)
 voidBtn.BorderSizePixel = 0
 voidBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -1583,11 +1588,11 @@ RunService.RenderStepped:Connect(function()
     setDot(voidKeyStatusDot, KEYBIND_VOID_TOGGLE)
 end)
 
-local voidHideSlider = createSlider(main, 594, "Void Hide Time", 0.05, 10, voidHideTime, 2, function(v)
+local voidHideSlider = createSlider(main, 592, "Void Hide Time", 0.05, 10, voidHideTime, 2, function(v)
     voidHideTime = v
 end)
 
-local voidAttackSlider = createSlider(main, 644, "Void Attack Time", 0.05, 10, voidAttackTime, 2, function(v)
+local voidAttackSlider = createSlider(main, 642, "Void Attack Time", 0.05, 10, voidAttackTime, 2, function(v)
     voidAttackTime = v
 end)
 
@@ -1597,7 +1602,7 @@ end)
 local espBtn = Instance.new("TextButton")
 espBtn.Parent = main
 espBtn.Size = UDim2.new(1, -20, 0, 30)
-espBtn.Position = UDim2.new(0, 10, 0, 724)
+espBtn.Position = UDim2.new(0, 10, 0, 722)
 espBtn.BackgroundColor3 = Color3.fromRGB(42, 96, 72)
 espBtn.BorderSizePixel = 0
 espBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -1609,7 +1614,7 @@ Instance.new("UICorner", espBtn).CornerRadius = UDim.new(0, 6)
 local saveCfgBtn = Instance.new("TextButton")
 saveCfgBtn.Parent = main
 saveCfgBtn.Size = UDim2.new(1, -20, 0, 30)
-saveCfgBtn.Position = UDim2.new(0, 10, 0, 758)
+saveCfgBtn.Position = UDim2.new(0, 10, 0, 756)
 saveCfgBtn.BackgroundColor3 = Color3.fromRGB(82, 88, 130)
 saveCfgBtn.BorderSizePixel = 0
 saveCfgBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -1621,7 +1626,7 @@ Instance.new("UICorner", saveCfgBtn).CornerRadius = UDim.new(0, 6)
 local loadCfgBtn = Instance.new("TextButton")
 loadCfgBtn.Parent = main
 loadCfgBtn.Size = UDim2.new(1, -20, 0, 30)
-loadCfgBtn.Position = UDim2.new(0, 10, 0, 792)
+loadCfgBtn.Position = UDim2.new(0, 10, 0, 790)
 loadCfgBtn.BackgroundColor3 = Color3.fromRGB(100, 84, 150)
 loadCfgBtn.BorderSizePixel = 0
 loadCfgBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -3331,6 +3336,10 @@ end
 local function stopVoid()
     voidEnabled = false
     voidThread = nil
+    if voidPostSimConn then
+        voidPostSimConn:Disconnect()
+        voidPostSimConn = nil
+    end
     U.voidBtn.Text = voidBtnLabel(false)
     U.voidBtn.BackgroundColor3 = Color3.fromRGB(42, 62, 96)
     local myHRP = getMyHRP()
@@ -3355,17 +3364,30 @@ local function buildVoidAnchorPos(origin)
     local sz = (math.random() < 0.5) and -1 or 1
     local ox = useX and (voidDistanceStuds * sx) or 0
     local oz = useX and 0 or (voidDistanceStuds * sz)
-    return Vector3.new(
+    local target = Vector3.new(
         origin.X + ox,
         math.max(origin.Y + 1500, 1500),
         origin.Z + oz
     )
+    local delta = target - origin
+    local mag = delta.Magnitude
+    if mag > VOID_MAX_REPLICATE_OFFSET_STUDS and mag > 1e-4 then
+        target = origin + delta.Unit * VOID_MAX_REPLICATE_OFFSET_STUDS
+    end
+    return target
 end
 
 local function forceVoidPosition(hrp)
     if not hrp then return false end
     local before = hrp.Position
     local targetPos = voidAnchorPos or buildVoidAnchorPos(before)
+    do
+        local d = targetPos - before
+        local m = d.Magnitude
+        if m > VOID_MAX_REPLICATE_OFFSET_STUDS and m > 1e-4 then
+            targetPos = before + d.Unit * VOID_MAX_REPLICATE_OFFSET_STUDS
+        end
+    end
     voidAnchorPos = targetPos
 
     local ok = pcall(function()
@@ -3395,9 +3417,23 @@ local function forceVoidPosition(hrp)
 end
 
 local function startVoid()
+    if voidPostSimConn then
+        voidPostSimConn:Disconnect()
+        voidPostSimConn = nil
+    end
     voidEnabled = true
     U.voidBtn.Text = voidBtnLabel(true)
     U.voidBtn.BackgroundColor3 = Color3.fromRGB(78, 112, 200)
+
+    voidPostSimConn = RunService.PostSimulation:Connect(function()
+        if not voidEnabled then
+            return
+        end
+        local hrp = getMyHRP()
+        if hrp then
+            forceVoidPosition(hrp)
+        end
+    end)
 
     local thisThread = {}
     voidThread = thisThread
