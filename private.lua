@@ -1,6 +1,7 @@
 
-
-
+repeat
+	task.wait()
+until game:IsLoaded()
 
 local Players = game:GetService("Players")
 local UIS = game:GetService("UserInputService")
@@ -63,16 +64,151 @@ end
 -- Orbit/Rage state
 local orbitEnabled = false
 local orbitConn = nil
-local orbitAngle = 0
 local orbitSpeed = 140 -- slider default (max on slider is higher)
 local tpInterval = 0.018 -- seconds between orbit TP steps (smaller = faster)
 local tpRadius = 6 -- studs
 local tpAccumulator = 0
 local orbitPatternIndex = 1
-local orbitPatterns = {"Random spot"}
+-- Private: 랜덤 스팟·Up(거리 100만~700만 studs, 틱 0.01s)
+local orbitPatterns = { "Random spot", "Up" }
+local ORBIT_PRIVATE_DIST_MIN = 1000000
+local ORBIT_PRIVATE_DIST_MAX = 7000000
+local ORBIT_PRIVATE_SPOT_UP_STEP = 0.01
+
+local function orbitPatternDisplayKo(name)
+    if name == "Random spot" then
+        return "랜덤 스팟"
+    elseif name == "Up" then
+        return "Up"
+    end
+    return tostring(name)
+end
+
 local orbitPatternNamesKo = nil
 local rageBurstHits = 2
 local selectedTargetName = ""
+
+-- Riot: 적 주위 스트레이프 + (옵션) 이름에 "riot" 포함 Tool Activate — Orbit과 상호 배제
+local riotCharacter = nil
+local riotTeleportLoopActive = false
+local riotEnabled = false
+local riotCharAddedConn = nil
+local STRAFE_RADIUS = 12
+local STRAFE_SPEED = 8
+local AUTOSHOOT = true
+
+local function riotBtnLabel(on)
+    return "Riot: " .. (on and "ON" or "OFF")
+end
+
+local function riotIsEnemy(targetPlayer)
+    if not targetPlayer or targetPlayer == LP then
+        return false
+    end
+    if targetPlayer.Team and LP.Team and targetPlayer.Team == LP.Team then
+        return false
+    end
+    return true
+end
+
+local function getAliveRiotEnemies()
+    local enemies = {}
+    for _, p in ipairs(Players:GetPlayers()) do
+        if riotIsEnemy(p) and p.Character then
+            local hum = p.Character:FindFirstChildOfClass("Humanoid")
+            local root = p.Character:FindFirstChild("HumanoidRootPart")
+            if hum and hum.Health > 0 and root then
+                table.insert(enemies, { rootPart = root })
+            end
+        end
+    end
+    return enemies
+end
+
+local function stopRiotAbuser()
+    riotTeleportLoopActive = false
+end
+
+local function startRiotAbuser()
+    if riotTeleportLoopActive then
+        return
+    end
+    riotTeleportLoopActive = true
+
+    task.spawn(function()
+        local angle = 0
+
+        while riotTeleportLoopActive and riotEnabled do
+            local hrp = riotCharacter and riotCharacter:FindFirstChild("HumanoidRootPart")
+            if not hrp then
+                task.wait(0.2)
+                continue
+            end
+
+            local enemies = getAliveRiotEnemies()
+            if #enemies > 0 then
+                local target = enemies[math.random(1, #enemies)]
+                local targetRoot = target.rootPart
+
+                angle = angle + STRAFE_SPEED * 0.03
+
+                local offsetX = math.cos(angle) * STRAFE_RADIUS
+                local offsetZ = math.sin(angle) * STRAFE_RADIUS
+
+                local newPos = targetRoot.Position + Vector3.new(offsetX, 2, offsetZ)
+                pcall(function()
+                    hrp.CFrame = CFrame.new(newPos, targetRoot.Position)
+                end)
+
+                if AUTOSHOOT then
+                    local tool = LP.Character and LP.Character:FindFirstChildOfClass("Tool")
+                    if tool and string.find(string.lower(tool.Name), "riot", 1, true) then
+                        pcall(function()
+                            tool:Activate()
+                        end)
+                    end
+                end
+            end
+
+            task.wait(0.03)
+        end
+        riotTeleportLoopActive = false
+    end)
+end
+
+local function setupRiotCharacterHandler()
+    if riotCharAddedConn then
+        pcall(function()
+            riotCharAddedConn:Disconnect()
+        end)
+        riotCharAddedConn = nil
+    end
+    local function onRiotCharacter(char)
+        riotCharacter = char
+        task.delay(0.8, function()
+            if not riotEnabled then
+                return
+            end
+            stopRiotAbuser()
+            startRiotAbuser()
+        end)
+    end
+    riotCharAddedConn = LP.CharacterAdded:Connect(onRiotCharacter)
+    if LP.Character then
+        onRiotCharacter(LP.Character)
+    end
+end
+
+local function teardownRiotCharacterHandler()
+    stopRiotAbuser()
+    riotCharacter = nil
+    if riotCharAddedConn then
+        pcall(function()
+            riotCharAddedConn:Disconnect()
+        end)
+        riotCharAddedConn = nil
+    end
+end
 
 local voidEnabled = false
 local voidThread = nil
@@ -972,7 +1108,7 @@ topDistLabelRef = topDistLabel
 local main = Instance.new("Frame")
 main.Name = "MainUI"
 main.Parent = gui
-main.Size = UDim2.new(0, 340, 0, 834)
+main.Size = UDim2.new(0, 340, 0, 882)
 main.Position = UDim2.new(0.5, -140, 0.5, -120)
 main.BackgroundColor3 = Color3.fromRGB(28, 28, 35)
 main.BorderSizePixel = 1
@@ -1088,16 +1224,29 @@ local orbitCorner = Instance.new("UICorner")
 orbitCorner.CornerRadius = UDim.new(0, 8)
 orbitCorner.Parent = orbitBtn
 
+local riotBtn = Instance.new("TextButton")
+riotBtn.Name = "RiotToggleButton"
+riotBtn.Parent = main
+riotBtn.Size = UDim2.new(0, 180, 0, 34)
+riotBtn.Position = UDim2.new(0.5, -90, 0, 150)
+riotBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 78)
+riotBtn.BorderSizePixel = 0
+riotBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+riotBtn.Font = Enum.Font.GothamBold
+riotBtn.TextSize = 12
+riotBtn.Text = riotBtnLabel(false)
+Instance.new("UICorner", riotBtn).CornerRadius = UDim.new(0, 8)
+
 local orbitPatternBtn = Instance.new("TextButton")
 orbitPatternBtn.Parent = main
 orbitPatternBtn.Size = UDim2.new(1, -20, 0, 24)
-orbitPatternBtn.Position = UDim2.new(0, 10, 0, 138)
+orbitPatternBtn.Position = UDim2.new(0, 10, 0, 188)
 orbitPatternBtn.BackgroundColor3 = Color3.fromRGB(52, 52, 70)
 orbitPatternBtn.BorderSizePixel = 0
 orbitPatternBtn.TextColor3 = Color3.fromRGB(235, 235, 245)
 orbitPatternBtn.Font = Enum.Font.Gotham
 orbitPatternBtn.TextSize = 11
-orbitPatternBtn.Text = "Orbit Pattern: " .. (orbitPatterns[orbitPatternIndex])
+orbitPatternBtn.Text = "Orbit Pattern: " .. orbitPatternDisplayKo(orbitPatterns[orbitPatternIndex])
 Instance.new("UICorner", orbitPatternBtn).CornerRadius = UDim.new(0, 6)
 
 local function createSlider(parent, y, titleText, minV, maxV, startV, decimals, onChanged)
@@ -1216,15 +1365,15 @@ end
 
 -- (removed UI Scale slider)
 
-local speedSlider = createSlider(main, 168, "Orbit Speed", 1, 4500, orbitSpeed, 0, function(v)
+local speedSlider = createSlider(main, 216, "Orbit Speed", 1, 4500, orbitSpeed, 0, function(v)
     orbitSpeed = math.floor(v + 0.5)
 end)
 
-local distanceSlider = createSlider(main, 218, "Orbit Distance", 2, 700000, tpRadius, 0, function(v)
+local distanceSlider = createSlider(main, 266, "Orbit Distance", 2, 700000, tpRadius, 0, function(v)
     tpRadius = v
 end)
 
-local intervalSlider = createSlider(main, 268, "Orbit TP Time", 0.0001, 1.5, tpInterval, 4, function(v)
+local intervalSlider = createSlider(main, 316, "Orbit TP Time", 0.0001, 1.5, tpInterval, 4, function(v)
     tpInterval = v
 end)
 
@@ -1232,7 +1381,7 @@ end)
 local targetLabel = Instance.new("TextLabel")
 targetLabel.Parent = main
 targetLabel.Size = UDim2.new(1, -20, 0, 18)
-targetLabel.Position = UDim2.new(0, 10, 0, 322)
+targetLabel.Position = UDim2.new(0, 10, 0, 370)
 targetLabel.BackgroundTransparency = 1
 targetLabel.TextColor3 = Color3.fromRGB(220, 220, 235)
 targetLabel.Font = Enum.Font.Gotham
@@ -1243,7 +1392,7 @@ targetLabel.Text = "Target: None"
 local refreshTargetBtn = Instance.new("TextButton")
 refreshTargetBtn.Parent = main
 refreshTargetBtn.Size = UDim2.new(1, -20, 0, 24)
-refreshTargetBtn.Position = UDim2.new(0, 10, 0, 342)
+refreshTargetBtn.Position = UDim2.new(0, 10, 0, 390)
 refreshTargetBtn.BackgroundColor3 = Color3.fromRGB(45, 45, 60)
 refreshTargetBtn.BorderSizePixel = 0
 refreshTargetBtn.TextColor3 = Color3.fromRGB(230, 230, 245)
@@ -1255,7 +1404,7 @@ Instance.new("UICorner", refreshTargetBtn).CornerRadius = UDim.new(0, 6)
 local playerListFrame = Instance.new("ScrollingFrame")
 playerListFrame.Parent = main
 playerListFrame.Size = UDim2.new(1, -20, 0, 88)
-playerListFrame.Position = UDim2.new(0, 10, 0, 370)
+playerListFrame.Position = UDim2.new(0, 10, 0, 418)
 playerListFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 48)
 playerListFrame.BorderSizePixel = 0
 playerListFrame.ScrollBarThickness = 4
@@ -1274,7 +1423,7 @@ listLayout.Padding = UDim.new(0, 4)
 local voidBtn = Instance.new("TextButton")
 voidBtn.Parent = main
 voidBtn.Size = UDim2.new(1, -20, 0, 30)
-voidBtn.Position = UDim2.new(0, 10, 0, 508)
+voidBtn.Position = UDim2.new(0, 10, 0, 556)
 voidBtn.BackgroundColor3 = Color3.fromRGB(42, 62, 96)
 voidBtn.BorderSizePixel = 0
 voidBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -1434,11 +1583,11 @@ RunService.RenderStepped:Connect(function()
     setDot(voidKeyStatusDot, KEYBIND_VOID_TOGGLE)
 end)
 
-local voidHideSlider = createSlider(main, 546, "Void Hide Time", 0.05, 10, voidHideTime, 2, function(v)
+local voidHideSlider = createSlider(main, 594, "Void Hide Time", 0.05, 10, voidHideTime, 2, function(v)
     voidHideTime = v
 end)
 
-local voidAttackSlider = createSlider(main, 596, "Void Attack Time", 0.05, 10, voidAttackTime, 2, function(v)
+local voidAttackSlider = createSlider(main, 644, "Void Attack Time", 0.05, 10, voidAttackTime, 2, function(v)
     voidAttackTime = v
 end)
 
@@ -1448,7 +1597,7 @@ end)
 local espBtn = Instance.new("TextButton")
 espBtn.Parent = main
 espBtn.Size = UDim2.new(1, -20, 0, 30)
-espBtn.Position = UDim2.new(0, 10, 0, 676)
+espBtn.Position = UDim2.new(0, 10, 0, 724)
 espBtn.BackgroundColor3 = Color3.fromRGB(42, 96, 72)
 espBtn.BorderSizePixel = 0
 espBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -1460,7 +1609,7 @@ Instance.new("UICorner", espBtn).CornerRadius = UDim.new(0, 6)
 local saveCfgBtn = Instance.new("TextButton")
 saveCfgBtn.Parent = main
 saveCfgBtn.Size = UDim2.new(1, -20, 0, 30)
-saveCfgBtn.Position = UDim2.new(0, 10, 0, 710)
+saveCfgBtn.Position = UDim2.new(0, 10, 0, 758)
 saveCfgBtn.BackgroundColor3 = Color3.fromRGB(82, 88, 130)
 saveCfgBtn.BorderSizePixel = 0
 saveCfgBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -1472,7 +1621,7 @@ Instance.new("UICorner", saveCfgBtn).CornerRadius = UDim.new(0, 6)
 local loadCfgBtn = Instance.new("TextButton")
 loadCfgBtn.Parent = main
 loadCfgBtn.Size = UDim2.new(1, -20, 0, 30)
-loadCfgBtn.Position = UDim2.new(0, 10, 0, 744)
+loadCfgBtn.Position = UDim2.new(0, 10, 0, 792)
 loadCfgBtn.BackgroundColor3 = Color3.fromRGB(100, 84, 150)
 loadCfgBtn.BorderSizePixel = 0
 loadCfgBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -2201,6 +2350,7 @@ end)
     U.saveCfgBtn = saveCfgBtn
     U.voidBtn = voidBtn
     U.orbitBtn = orbitBtn
+    U.riotBtn = riotBtn
     U.espBtn = espBtn
     U.aaSpecialBtn = aaSpecialBtn
     U.playerListFrame = playerListFrame
@@ -2268,16 +2418,16 @@ local function getOrbitOffset(patternName, angle, radius)
         local rr = math.random() * r
         return Vector3.new(math.cos(a) * rr, (math.random() - 0.5) * 1.5, math.sin(a) * rr)
     elseif patternName == "Random spot" then
-        local dx = math.random() - 0.5
-        local dz = math.random() - 0.5
-        -- keep huge distance, but avoid massive Y teleports that cause freeze/disappear behavior
-        local dir = Vector3.new(dx, 0, dz)
-        if dir.Magnitude < 1e-4 then
-            dir = Vector3.new(1, 0, 0)
-        else
-            dir = dir.Unit
-        end
-        return Vector3.new(dir.X * r, (math.random() - 0.5) * 8, dir.Z * r)
+        -- 매 틱 "스팟": 방향·반지름 모두 랜덤(디스크 내부 균일). 예전처럼 테두리 한 바퀴만이 아님.
+        local a = math.random() * math.pi * 2
+        local t = math.sqrt(math.random())
+        local inner = 0.1
+        local dist = (inner + (1 - inner) * t) * r
+        local dx = math.cos(a) * dist
+        local dz = math.sin(a) * dist
+        local yAmp = math.clamp(r * 0.00035, 30, 8000)
+        local dy = (math.random() - 0.5) * 2 * yAmp
+        return Vector3.new(dx, dy, dz)
     elseif patternName == "Star" then
         local rr = r * (0.55 + 0.45 * math.cos(5 * angle))
         return Vector3.new(math.cos(angle) * rr, 0, math.sin(angle) * rr)
@@ -2802,6 +2952,29 @@ local function startAAWatchdog()
 end
 startAAWatchdog()
 
+local function stopRiot()
+    riotEnabled = false
+    teardownRiotCharacterHandler()
+    if U.riotBtn and U.riotBtn.Parent then
+        U.riotBtn.Text = riotBtnLabel(false)
+        U.riotBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 78)
+    end
+end
+
+local function startRiot()
+    if riotEnabled then
+        return
+    end
+    riotEnabled = true
+    if orbitEnabled then
+        stopOrbit()
+    end
+    if U.riotBtn and U.riotBtn.Parent then
+        U.riotBtn.Text = riotBtnLabel(true)
+        U.riotBtn.BackgroundColor3 = Color3.fromRGB(95, 75, 190)
+    end
+    setupRiotCharacterHandler()
+end
 
 local function stopOrbit()
     orbitEnabled = false
@@ -2817,6 +2990,9 @@ end
 -- (Silent Aim core removed)
 
 local function startOrbit()
+    if riotEnabled then
+        stopRiot()
+    end
     if orbitConn then orbitConn:Disconnect() end
     orbitEnabled = true
     U.orbitBtn.Text = orbitBtnLabel(true)
@@ -2836,9 +3012,7 @@ local function startOrbit()
 
         local patternName = orbitPatterns[orbitPatternIndex]
 
-        -- Private: 패턴 중심 동작
-        -- Random spot 거리(100k~700k)는 유지하고, 틱만 안정화해서 제자리 고정 현상 완화
-        local stepInterval = (patternName == "Random spot") and 0.008 or 0.012
+        local stepInterval = ORBIT_PRIVATE_SPOT_UP_STEP
 
         tpAccumulator = tpAccumulator + dt
         if tpAccumulator < stepInterval then
@@ -2846,17 +3020,14 @@ local function startOrbit()
         end
         tpAccumulator = 0
 
-        local angleStep = 1.2
-        orbitAngle = orbitAngle + angleStep + ((math.random() - 0.5) * 0.4)
-
-        local r = tpRadius
+        local r
         local offset
         if patternName == "Random spot" then
-            r = math.random(100000, 700000)
+            r = math.random(ORBIT_PRIVATE_DIST_MIN, ORBIT_PRIVATE_DIST_MAX)
             offset = getOrbitOffset("Random spot", 0, r)
         else
-            local h = (math.random() - 0.5) * 1.5
-            offset = getOrbitOffset(patternName, orbitAngle, r) + Vector3.new(0, h, 0)
+            r = math.random(ORBIT_PRIVATE_DIST_MIN, ORBIT_PRIVATE_DIST_MAX)
+            offset = Vector3.new(0, r, 0)
         end
         pcall(function()
             me.CFrame = CFrame.new(hrp.Position + offset)
@@ -2874,10 +3045,18 @@ U.orbitBtn.MouseButton1Click:Connect(function()
     end
 end)
 
+U.riotBtn.MouseButton1Click:Connect(function()
+    if riotEnabled then
+        stopRiot()
+    else
+        startRiot()
+    end
+end)
+
 U.orbitPatternBtn.MouseButton1Click:Connect(function()
     orbitPatternIndex = orbitPatternIndex + 1
     if orbitPatternIndex > #orbitPatterns then orbitPatternIndex = 1 end
-    U.orbitPatternBtn.Text = "Orbit Pattern: " .. (orbitPatterns[orbitPatternIndex])
+    U.orbitPatternBtn.Text = "Orbit Pattern: " .. orbitPatternDisplayKo(orbitPatterns[orbitPatternIndex])
 end)
 
 local function findTargetPlayer(nameText)
@@ -3294,6 +3473,7 @@ local function collectConfig()
         keybindHotkeysEnabled = keybindHotkeysEnabled,
         states = {
             orbitEnabled = orbitEnabled,
+            riotEnabled = riotEnabled,
             voidEnabled = voidEnabled,
             espEnabled = espEnabled,
             mvEnabled = mvEnabled,
@@ -3321,8 +3501,15 @@ local function applyConfig(cfg)
     if type(cfg.tpInterval) == "number" then U.intervalSlider.setValue(cfg.tpInterval) end
 	-- uiScale removed
     if type(cfg.orbitPatternIndex) == "number" then
-        orbitPatternIndex = math.clamp(math.floor(cfg.orbitPatternIndex), 1, #orbitPatterns)
-        U.orbitPatternBtn.Text = "Orbit Pattern: " .. (orbitPatterns[orbitPatternIndex])
+        local raw = math.floor(cfg.orbitPatternIndex)
+        -- 예전: 1=Circle 2=Random 3=Up → 현재: 1=Random 2=Up
+        if raw >= 3 then
+            orbitPatternIndex = 2
+        else
+            orbitPatternIndex = 1
+        end
+        orbitPatternIndex = math.clamp(orbitPatternIndex, 1, #orbitPatterns)
+        U.orbitPatternBtn.Text = "Orbit Pattern: " .. orbitPatternDisplayKo(orbitPatterns[orbitPatternIndex])
     end
 	-- TP params
 	if type(cfg.tp2Height) == "number" then U.tpHeightSlider.setValue(cfg.tp2Height) end
@@ -3354,6 +3541,11 @@ local function applyConfig(cfg)
     local st = cfg.states
     if type(st) == "table" then
         if st.orbitEnabled then startOrbit() else stopOrbit() end
+        if type(st.riotEnabled) == "boolean" and st.riotEnabled then
+            startRiot()
+        else
+            stopRiot()
+        end
         if st.voidEnabled then startVoid() else stopVoid() end
         if st.espEnabled then startESP() else stopESP() end
         if type(st.mvEnabled) == "boolean" then
