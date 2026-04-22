@@ -514,6 +514,12 @@ local function applyPrivateKey(raw)
             savePrivateKeyToFile(manualPrivateKey)
         end)
         setKeyStatus("Key Status: AUTHORIZED")
+        pcall(function()
+            if keyInputGui and keyInputGui.Parent then
+                keyInputGui:Destroy()
+            end
+        end)
+        keyInputGui, keyInputBoxNative, keyInputStatusNative = nil, nil, nil
         return true
     end
     keyAuthed = false
